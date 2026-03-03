@@ -1,0 +1,335 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  writeBatch,
+  getDocs,
+  Timestamp,
+} from "firebase/firestore";
+import dayjs from "dayjs";
+import type { SlotInfo } from "react-big-calendar";
+import { db } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
+import CalendarView from "../components/CalendarView";
+import type { CalendarEvent } from "../types";
+
+type Recurrence = "none" | "weekly" | "monthly";
+
+interface CreateModal {
+  open: boolean;
+  start?: Date;
+  end?: Date;
+  title: string;
+  recurrence: Recurrence;
+  repeatCount: number;
+}
+
+const INITIAL_MODAL: CreateModal = {
+  open: false,
+  title: "",
+  recurrence: "none",
+  repeatCount: 4,
+};
+
+export default function SchedulePage() {
+  const { user } = useAuth();
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<CreateModal>(INITIAL_MODAL);
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean;
+    event?: CalendarEvent;
+  }>({ open: false });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "availabilities"),
+      where("userId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: CalendarEvent[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title
+            ? `${data.userName} — ${data.title}`
+            : data.userName,
+          start: data.start.toDate(),
+          end: data.end.toDate(),
+          resource: {
+            userId: data.userId,
+            userEmail: data.userEmail,
+            userName: data.userName,
+            recurrenceGroupId: data.recurrenceGroupId ?? null,
+          },
+        };
+      });
+      setEvents(items);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
+    setModal({
+      ...INITIAL_MODAL,
+      open: true,
+      start: slotInfo.start,
+      end: slotInfo.end,
+    });
+  }, []);
+
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    setDeleteModal({ open: true, event });
+  }, []);
+
+  async function handleCreateAvailability() {
+    if (!user || !modal.start || !modal.end) return;
+
+    const base = {
+      userId: user.uid,
+      userEmail: user.email,
+      userName: user.displayName || "Anonymous",
+      title: modal.title,
+      createdAt: Timestamp.now(),
+    };
+
+    if (modal.recurrence === "none") {
+      await addDoc(collection(db, "availabilities"), {
+        ...base,
+        start: Timestamp.fromDate(modal.start),
+        end: Timestamp.fromDate(modal.end),
+      });
+    } else {
+      const groupId = crypto.randomUUID();
+      const batch = writeBatch(db);
+      const unit = modal.recurrence === "weekly" ? "week" : "month";
+
+      for (let i = 0; i < modal.repeatCount; i++) {
+        const start = dayjs(modal.start).add(i, unit).toDate();
+        const end = dayjs(modal.end).add(i, unit).toDate();
+        const ref = doc(collection(db, "availabilities"));
+        batch.set(ref, {
+          ...base,
+          start: Timestamp.fromDate(start),
+          end: Timestamp.fromDate(end),
+          recurrenceGroupId: groupId,
+        });
+      }
+
+      await batch.commit();
+    }
+
+    setModal(INITIAL_MODAL);
+  }
+
+  async function handleDeleteSingle() {
+    if (!deleteModal.event) return;
+    await deleteDoc(doc(db, "availabilities", deleteModal.event.id));
+    setDeleteModal({ open: false });
+  }
+
+  async function handleDeleteSeries() {
+    if (!deleteModal.event) return;
+    const groupId = deleteModal.event.resource.recurrenceGroupId;
+    if (!groupId) return;
+
+    const q = query(
+      collection(db, "availabilities"),
+      where("recurrenceGroupId", "==", groupId)
+    );
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+
+    setDeleteModal({ open: false });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  const hasRecurrenceGroup = deleteModal.event?.resource.recurrenceGroupId;
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">My Schedule</h1>
+        <p className="text-sm text-gray-500">
+          Click or drag on the calendar to register your availability. Click an
+          existing slot to remove it.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <CalendarView
+          events={events}
+          selectable
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+        />
+      </div>
+
+      {modal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Register Availability
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {modal.start?.toLocaleString()} &mdash;{" "}
+              {modal.end?.toLocaleString()}
+            </p>
+
+            <div className="mt-4">
+              <label
+                htmlFor="title"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Label (optional)
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={modal.title}
+                onChange={(e) =>
+                  setModal((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="e.g. Morning Session"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Repeat
+              </label>
+              <div className="mt-1 flex gap-2">
+                {(["none", "weekly", "monthly"] as Recurrence[]).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() =>
+                      setModal((prev) => ({ ...prev, recurrence: opt }))
+                    }
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                      modal.recurrence === opt
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {opt === "none"
+                      ? "Once"
+                      : opt === "weekly"
+                        ? "Weekly"
+                        : "Monthly"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {modal.recurrence !== "none" && (
+              <div className="mt-4">
+                <label
+                  htmlFor="repeatCount"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Number of occurrences
+                </label>
+                <input
+                  id="repeatCount"
+                  type="number"
+                  min={2}
+                  max={52}
+                  value={modal.repeatCount}
+                  onChange={(e) =>
+                    setModal((prev) => ({
+                      ...prev,
+                      repeatCount: Math.max(2, Math.min(52, Number(e.target.value))),
+                    }))
+                  }
+                  className="mt-1 w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Creates {modal.repeatCount} slots,{" "}
+                  {modal.recurrence === "weekly" ? "one per week" : "one per month"}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setModal(INITIAL_MODAL)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateAvailability}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                {modal.recurrence !== "none"
+                  ? `Create ${modal.repeatCount} Slots`
+                  : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal.open && deleteModal.event && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Remove Availability
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Are you sure you want to remove{" "}
+              <span className="font-medium">{deleteModal.event.title}</span>?
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {deleteModal.event.start.toLocaleString()} &mdash;{" "}
+              {deleteModal.event.end.toLocaleString()}
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteModal({ open: false })}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              {hasRecurrenceGroup && (
+                <button
+                  onClick={handleDeleteSeries}
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700"
+                >
+                  Remove All in Series
+                </button>
+              )}
+              <button
+                onClick={handleDeleteSingle}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+              >
+                {hasRecurrenceGroup ? "Remove This Only" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
