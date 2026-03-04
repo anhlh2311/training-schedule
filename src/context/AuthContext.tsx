@@ -6,10 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import {
-  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
-  signInWithRedirect,
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
@@ -98,47 +96,23 @@ function isEmbeddedBrowser(): boolean {
   return EMBEDDED_BROWSER_PATTERNS.some((p) => ua.includes(p));
 }
 
-function isMobileRealBrowser(): boolean {
-  if (typeof window === "undefined") return false;
-  const ua = navigator.userAgent.toLowerCase();
-  return /android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini/i.test(ua);
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-    let unsubscribe: (() => void) | null = null;
-
-    getRedirectResult(auth)
-      .then((result) => {
-        if (mounted && result?.user) {
-          return upsertUserDoc(result.user);
-        }
-      })
-      .catch(() => {
-        // Redirect errors (e.g. user cancelled) are handled silently
-      })
-      .finally(() => {
-        if (!mounted) return;
-        unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-          setUser(firebaseUser);
-          if (!firebaseUser) {
-            setAppUser(null);
-          } else {
-            await upsertUserDoc(firebaseUser);
-          }
-          setLoading(false);
-        });
-      });
-
-    return () => {
-      mounted = false;
-      unsubscribe?.();
-    };
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (!firebaseUser) {
+        setAppUser(null);
+        setLoading(false);
+        return;
+      }
+      await upsertUserDoc(firebaseUser);
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -166,13 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isEmbeddedBrowserFlag = isEmbeddedBrowser();
 
   async function signInWithGoogle() {
-    if (isEmbeddedBrowserFlag) {
-      return;
-    }
-    if (isMobileRealBrowser()) {
-      await signInWithRedirect(auth, googleProvider);
-      return;
-    }
+    if (isEmbeddedBrowserFlag) return;
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: unknown) {
