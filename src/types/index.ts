@@ -30,6 +30,7 @@ export interface CalendarEvent {
     userId: string;
     userEmail: string;
     userName: string;
+    userPhotoURL?: string;
     recurrenceGroupId?: string | null;
   };
 }

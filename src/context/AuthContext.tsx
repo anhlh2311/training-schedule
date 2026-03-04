@@ -16,6 +16,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
@@ -36,6 +37,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function resolveInvitedRole(email: string): Promise<UserRole | null> {
+  try {
+    const inviteRef = doc(db, "invites", email.toLowerCase());
+    const snap = await getDoc(inviteRef);
+    if (!snap.exists()) return null;
+    const role = snap.data().role as UserRole;
+    // Delete consumed invite; use try-catch so a delete failure
+    // doesn't block user creation
+    try {
+      await deleteDoc(inviteRef);
+    } catch {
+      // Invite cleanup failed -- admin can remove it manually
+    }
+    return role;
+  } catch {
+    return null;
+  }
+}
+
 async function upsertUserDoc(firebaseUser: User): Promise<void> {
   const userRef = doc(db, "users", firebaseUser.uid);
   const snap = await getDoc(userRef);
@@ -43,8 +63,14 @@ async function upsertUserDoc(firebaseUser: User): Promise<void> {
   if (snap.exists()) {
     await updateDoc(userRef, { lastLoginAt: Timestamp.now() });
   } else {
-    const role: UserRole =
-      firebaseUser.email === ADMIN_EMAIL ? "admin" : "user";
+    let role: UserRole = "user";
+
+    if (firebaseUser.email === ADMIN_EMAIL) {
+      role = "admin";
+    } else if (firebaseUser.email) {
+      const invitedRole = await resolveInvitedRole(firebaseUser.email);
+      if (invitedRole) role = invitedRole;
+    }
 
     await setDoc(userRef, {
       email: firebaseUser.email ?? "",

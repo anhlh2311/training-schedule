@@ -1,9 +1,30 @@
 import { useCallback, useMemo, useState } from "react";
-import { Calendar, dayjsLocalizer, type SlotInfo, type View, type NavigateAction } from "react-big-calendar";
+import { Calendar, dayjsLocalizer, type SlotInfo, type View, type NavigateAction, type EventProps } from "react-big-calendar";
 import dayjs from "dayjs";
 import type { CalendarEvent } from "../types";
 
 const localizer = dayjsLocalizer(dayjs);
+
+function CustomEvent({ event }: EventProps<CalendarEvent>) {
+  const photoURL = event.resource?.userPhotoURL;
+  return (
+    <div className="flex items-center gap-1.5 overflow-hidden">
+      {photoURL ? (
+        <img
+          src={photoURL}
+          alt=""
+          className="h-4 w-4 shrink-0 rounded-full"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/30 text-[8px] font-bold">
+          {event.resource?.userName?.[0] ?? "?"}
+        </div>
+      )}
+      <span className="truncate">{event.title}</span>
+    </div>
+  );
+}
 
 const USER_COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
@@ -60,6 +81,10 @@ export default function CalendarView({
     };
   }, []);
 
+  const components = useMemo(() => ({
+    event: CustomEvent,
+  }), []);
+
   const { scrollToTime, min, max } = useMemo(() => ({
     scrollToTime: dayjs().hour(8).minute(0).toDate(),
     min: dayjs().hour(8).minute(0).second(0).toDate(),
@@ -83,6 +108,7 @@ export default function CalendarView({
         onSelectSlot={onSelectSlot}
         onSelectEvent={onSelectEvent}
         eventPropGetter={eventStyleGetter}
+        components={components}
         popup
         step={30}
         timeslots={2}

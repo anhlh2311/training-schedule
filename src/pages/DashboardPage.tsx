@@ -28,6 +28,7 @@ export default function DashboardPage() {
             userId: data.userId,
             userEmail: data.userEmail,
             userName: data.userName,
+            userPhotoURL: data.userPhotoURL ?? "",
             recurrenceGroupId: data.recurrenceGroupId ?? null,
           },
         };

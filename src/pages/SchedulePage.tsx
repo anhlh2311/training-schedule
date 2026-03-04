@@ -68,6 +68,7 @@ export default function SchedulePage() {
             userId: data.userId,
             userEmail: data.userEmail,
             userName: data.userName,
+            userPhotoURL: data.userPhotoURL ?? "",
             recurrenceGroupId: data.recurrenceGroupId ?? null,
           },
         };
@@ -99,6 +100,7 @@ export default function SchedulePage() {
       userId: user.uid,
       userEmail: user.email,
       userName: user.displayName || "Anonymous",
+      userPhotoURL: user.photoURL || "",
       title: modal.title,
       createdAt: Timestamp.now(),
     };
