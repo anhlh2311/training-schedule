@@ -16,7 +16,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-xl">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <img
+            src="/IHN.png"
+            alt="IHN Logo"
+            className="mx-auto h-24 w-24"
+          />
+          <h1 className="mt-4 text-3xl font-bold text-gray-900">
             Training Schedule
           </h1>
           <p className="mt-2 text-gray-500">

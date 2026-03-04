@@ -22,7 +22,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <nav className="border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
-            <Link to="/" className="text-xl font-bold text-gray-900">
+            <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900">
+              <img src="/IHN.png" alt="IHN Logo" className="h-8 w-8" />
               Training Schedule
             </Link>
             <div className="flex gap-1">
