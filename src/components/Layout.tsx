@@ -79,19 +79,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             )}
 
-            {/* Mobile hamburger */}
+            {isTrainer && (
+              <>
+                <div className="mx-0.5 h-5 w-px bg-gray-200" />
+                <Link to="/admin/users" className={mobileIconClass("/admin/users")} aria-label="Users">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                  </svg>
+                </Link>
+                <Link to="/admin/trainers" className={mobileIconClass("/admin/trainers")} aria-label="Trainers">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                </Link>
+              </>
+            )}
+
+            {/* Mobile account menu */}
             <button
               onClick={() => setMobileOpen((v) => !v)}
-              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
-              aria-label="Toggle menu"
+              className="ml-0.5 rounded-lg p-1.5 text-gray-600 hover:bg-gray-100"
+              aria-label="Account menu"
             >
               {mobileOpen ? (
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               )}
             </button>
@@ -140,21 +156,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
         {mobileOpen && (
           <div className="modal-panel absolute left-0 right-0 z-20 border-t border-gray-200 bg-white px-4 pb-4 pt-2 shadow-lg md:hidden">
-            <div className="flex flex-col gap-1">
-              {isTrainer && (
-                <>
-                  <Link to="/admin/users" className={navLinkClass("/admin/users")} onClick={() => setMobileOpen(false)}>
-                    Users
-                  </Link>
-                  <Link to="/admin/trainers" className={navLinkClass("/admin/trainers")} onClick={() => setMobileOpen(false)}>
-                    Trainers
-                  </Link>
-                </>
-              )}
-            </div>
-
             {user && (
-              <div className={`flex items-center justify-between ${isTrainer ? "mt-3 border-t border-gray-200 pt-3" : ""}`}>
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {user.photoURL && (
                     <img
