@@ -6,8 +6,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
@@ -83,10 +85,30 @@ async function upsertUserDoc(firebaseUser: User): Promise<void> {
   }
 }
 
+function isMobileOrEmbedded(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
+  const isEmbedded = !window.opener && window.parent !== window;
+  return isMobile || isEmbedded;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          return upsertUserDoc(result.user);
+        }
+      })
+      .catch(() => {
+        // Redirect errors (e.g. user cancelled) are handled silently
+      });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -128,6 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isTrainer = appUser?.role === "trainer" || appUser?.role === "admin";
 
   async function signInWithGoogle() {
+    if (isMobileOrEmbedded()) {
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: unknown) {
