@@ -539,7 +539,7 @@ export default function CalendarView({
 
   // All other views (Month, Week on mobile; everything on desktop)
   return (
-    <div ref={calSwipeRef} className="h-[calc(100vh-280px)] min-h-[400px]">
+    <div ref={calSwipeRef} className="mb-5 h-[calc(100vh-220px)] min-h-[400px] md:h-[calc(100vh-280px)]">
       <Calendar
         localizer={localizer}
         events={events}
