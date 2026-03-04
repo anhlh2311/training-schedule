@@ -89,6 +89,17 @@ export default function UsersPage() {
       role: "trainer",
       createdAt: Timestamp.now(),
     });
+
+    try {
+      await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      // Email notification is best-effort; invite is saved regardless
+    }
+
     setInviteEmail("");
     setSubmitting(false);
   }
