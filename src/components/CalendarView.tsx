@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, dayjsLocalizer, type SlotInfo, type View, type NavigateAction, type EventProps, type HeaderProps, type ToolbarProps } from "react-big-calendar";
+import { Calendar, dayjsLocalizer, type SlotInfo, type View, type EventProps, type HeaderProps, type ToolbarProps } from "react-big-calendar";
 import dayjs from "dayjs";
 import "dayjs/locale/en-gb";
 import type { CalendarEvent } from "../types";
@@ -105,31 +105,24 @@ const VIEW_STYLES: Record<string, { active: string; inactive: string }> = {
 
 const VIEW_LABELS: Record<string, string> = { month: "Month", week: "Week", day: "Day" };
 
-function CustomToolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalendarEvent, object>) {
+function CustomToolbar({ label, onNavigate, onView, view, views, date }: ToolbarProps<CalendarEvent, object>) {
   const btnBase =
     "inline-flex items-center justify-center rounded-xl text-sm font-medium transition h-10 min-w-[40px] px-4";
   const navBtn = `${btnBase} bg-gray-50 text-gray-600 hover:bg-gray-100 active:scale-[0.97]`;
+  const todayBtn = "rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200 active:scale-[0.97]";
+
+  const showToday = (() => {
+    const d = dayjs(date);
+    const now = dayjs();
+    if (view === "month") return !d.isSame(now, "month");
+    if (view === "week") return !d.isSame(now, "week");
+    if (view === "day") return !d.isSame(now, "day");
+    return false;
+  })();
 
   return (
     <div className="mb-3 flex flex-col items-center gap-2">
-      <span className="text-sm font-semibold text-gray-900 sm:text-base">{label}</span>
-
-      <div className="flex items-center gap-1.5">
-        <button onClick={() => onNavigate("PREV")} className={navBtn} aria-label="Back">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-        <button onClick={() => onNavigate("TODAY")} className={navBtn}>
-          Today
-        </button>
-        <button onClick={() => onNavigate("NEXT")} className={navBtn} aria-label="Next">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
-        </button>
-      </div>
-
+      {/* Row 1: View buttons (Month, Week, Day) */}
       <div className="flex items-center gap-1.5">
         {(views as View[]).map((v) => {
           const colors = VIEW_STYLES[v] ?? VIEW_STYLES.week;
@@ -143,6 +136,25 @@ function CustomToolbar({ label, onNavigate, onView, view, views }: ToolbarProps<
             </button>
           );
         })}
+      </div>
+      {/* Row 2: Prev | Label | Today (conditional) | Next */}
+      <div className="flex items-center justify-center gap-2">
+        <button onClick={() => onNavigate("PREV")} className={navBtn} aria-label="Back">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <span className="min-w-[120px] text-center text-sm font-semibold text-gray-900 sm:text-base">{label}</span>
+        {showToday && (
+          <button onClick={() => onNavigate("TODAY")} className={todayBtn}>
+            Today
+          </button>
+        )}
+        <button onClick={() => onNavigate("NEXT")} className={navBtn} aria-label="Next">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -246,11 +258,14 @@ function MobileDayView({
 
   const btnBase =
     "inline-flex items-center justify-center rounded-xl text-sm font-medium transition h-10 min-w-[40px] px-4";
+  const navBtn = `${btnBase} bg-gray-50 text-gray-600 hover:bg-gray-100 active:scale-[0.97]`;
+  const todayBtn = "rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200 active:scale-[0.97]";
+  const showToday = !selectedDate.isSame(today, "day");
 
   return (
     <div ref={swipeRef} className="flex flex-col">
-      {/* View buttons */}
-      <div className="mb-3 flex items-center justify-center gap-1.5">
+      {/* Row 1: View buttons (Month, Week, Day) */}
+      <div className="mb-2 flex items-center justify-center gap-1.5">
         {(["month", "week", "day"] as View[]).map((v) => {
           const colors = VIEW_STYLES[v] ?? VIEW_STYLES.week;
           return (
@@ -264,37 +279,31 @@ function MobileDayView({
           );
         })}
       </div>
-
-      {/* Month header with nav */}
-      <div className="flex items-center justify-between px-1 pb-3">
+      {/* Row 2: Prev | Label | Today (conditional) | Next */}
+      <div className="mb-3 flex items-center justify-center gap-2">
         <button
           onClick={() => onNavigateWeek("prev")}
-          className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 active:scale-[0.95]"
-          aria-label="Previous week"
+          className={navBtn}
+          aria-label="Previous"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-gray-900">
-            {selectedDate.format("MMMM YYYY")}
-          </span>
-          {!selectedDate.isSame(today, "week") && (
-            <button
-              onClick={() => onNavigateWeek("today")}
-              className="rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100"
-            >
-              Today
-            </button>
-          )}
-        </div>
+        <span className="min-w-[120px] text-center text-sm font-semibold text-gray-900 sm:text-base">
+          {selectedDate.format("MMM YYYY")}
+        </span>
+        {showToday && (
+          <button onClick={() => onNavigateWeek("today")} className={todayBtn}>
+            Today
+          </button>
+        )}
         <button
           onClick={() => onNavigateWeek("next")}
-          className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 active:scale-[0.95]"
-          aria-label="Next week"
+          className={navBtn}
+          aria-label="Next"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
         </button>
@@ -341,7 +350,7 @@ function MobileDayView({
       {/* Selected date label */}
       <div className="border-t border-gray-100 px-1 pb-2 pt-3">
         <p className="text-sm font-medium text-gray-500">
-          {selectedDate.format("dddd, MMMM D, YYYY")}
+          {selectedDate.format("ddd, MMM D, YYYY")}
         </p>
       </div>
 
@@ -448,7 +457,7 @@ export default function CalendarView({
   const [date, setDate] = useState<Date>(new Date());
   const [mobileDate, setMobileDate] = useState(() => dayjs());
 
-  const handleNavigate = useCallback((newDate: Date, _view: View, _action: NavigateAction) => {
+  const handleNavigate = useCallback((newDate: Date) => {
     setDate(newDate);
   }, []);
 
@@ -484,6 +493,10 @@ export default function CalendarView({
   }), []);
 
   const formats = useMemo(() => ({
+    monthHeaderFormat: "MMM YYYY",
+    dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${dayjs(start).format("D MMM")} – ${dayjs(end).format("D MMM YYYY")}`,
+    dayHeaderFormat: "ddd D MMM",
     timeGutterFormat: "HH:mm",
     eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
       `${dayjs(start).format("HH:mm")} – ${dayjs(end).format("HH:mm")}`,
