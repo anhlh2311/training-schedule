@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "react-big-calendar/lib/css/react-big-calendar.css" layer(calendar);
+@import "react-big-calendar/lib/css/react-big-calendar.css";
 
 body {
   margin: 0;

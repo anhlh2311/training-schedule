@@ -1,9 +1,46 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, dayjsLocalizer, type SlotInfo, type View, type NavigateAction, type EventProps, type HeaderProps, type ToolbarProps } from "react-big-calendar";
 import dayjs from "dayjs";
 import type { CalendarEvent } from "../types";
 
 const localizer = dayjsLocalizer(dayjs);
+
+const SWIPE_THRESHOLD = 50;
+
+function useSwipe(onLeft: () => void, onRight: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function handleTouchStart(e: TouchEvent) {
+      const t = e.touches[0];
+      touchStart.current = { x: t.clientX, y: t.clientY };
+    }
+
+    function handleTouchEnd(e: TouchEvent) {
+      if (!touchStart.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStart.current.x;
+      const dy = t.clientY - touchStart.current.y;
+      touchStart.current = null;
+      if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dy) > Math.abs(dx)) return;
+      if (dx > 0) onRight();
+      else onLeft();
+    }
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [onLeft, onRight]);
+
+  return ref;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Shared helpers                                                     */
@@ -200,11 +237,16 @@ function MobileDayView({
     return set;
   }, [events]);
 
+  const swipeRef = useSwipe(
+    useCallback(() => onSelectDate(selectedDate.add(1, "day")), [onSelectDate, selectedDate]),
+    useCallback(() => onSelectDate(selectedDate.subtract(1, "day")), [onSelectDate, selectedDate]),
+  );
+
   const btnBase =
     "inline-flex items-center justify-center rounded-xl text-sm font-medium transition h-10 min-w-[40px] px-4";
 
   return (
-    <div className="flex flex-col">
+    <div ref={swipeRef} className="flex flex-col">
       {/* View buttons */}
       <div className="mb-3 flex items-center justify-center gap-1.5">
         {(["month", "week", "day"] as View[]).map((v) => {
@@ -450,6 +492,18 @@ export default function CalendarView({
     agendaTimeFormat: "HH:mm",
   }), []);
 
+  const navigatePrev = useCallback(() => {
+    const unit = view === "month" ? "month" : view === "week" ? "week" : "day";
+    setDate((d) => dayjs(d).subtract(1, unit).toDate());
+  }, [view]);
+
+  const navigateNext = useCallback(() => {
+    const unit = view === "month" ? "month" : view === "week" ? "week" : "day";
+    setDate((d) => dayjs(d).add(1, unit).toDate());
+  }, [view]);
+
+  const calSwipeRef = useSwipe(navigateNext, navigatePrev);
+
   // Mobile + Day view → card-based layout
   if (isMobile && view === "day") {
     return (
@@ -470,7 +524,7 @@ export default function CalendarView({
 
   // All other views (Month, Week on mobile; everything on desktop)
   return (
-    <div className="h-[calc(100vh-280px)] min-h-[400px]">
+    <div ref={calSwipeRef} className="h-[calc(100vh-280px)] min-h-[400px]">
       <Calendar
         localizer={localizer}
         events={events}
