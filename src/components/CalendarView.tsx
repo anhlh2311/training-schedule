@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, dayjsLocalizer, type SlotInfo, type View, type NavigateAction, type EventProps, type HeaderProps, type ToolbarProps } from "react-big-calendar";
 import dayjs from "dayjs";
+import "dayjs/locale/en-gb";
 import type { CalendarEvent } from "../types";
 
+dayjs.locale("en-gb");
 const localizer = dayjsLocalizer(dayjs);
 
 const SWIPE_THRESHOLD = 50;
@@ -79,9 +81,9 @@ function formatDuration(start: Date, end: Date): string {
 function CustomHeader({ date }: HeaderProps) {
   const d = dayjs(date);
   return (
-    <div className="flex flex-col items-center leading-tight">
-      <span className="text-xs font-medium text-gray-500">{d.format("ddd")}</span>
-      <span className="text-sm font-semibold text-gray-900">{d.format("DD")}</span>
+    <div className="flex flex-col items-center gap-0 leading-tight">
+      <span className="text-[11px] font-medium uppercase text-gray-500">{d.format("ddd")}</span>
+      <span className="rbc-date-num text-xs font-semibold text-gray-900">{d.format("DD")}</span>
     </div>
   );
 }

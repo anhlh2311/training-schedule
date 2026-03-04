@@ -100,6 +100,10 @@ body {
   letter-spacing: 0.04em;
 }
 
+.rbc-month-header .rbc-date-num {
+  display: none;
+}
+
 .rbc-month-view .rbc-date-cell {
   padding: 6px 8px;
   font-size: 0.8rem;
@@ -146,7 +150,7 @@ body {
 
 .rbc-time-view .rbc-header {
   border-bottom: none;
-  padding: 12px 0;
+  padding: 6px 0;
   font-size: 0.95rem;
 }
 
