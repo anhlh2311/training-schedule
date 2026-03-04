@@ -96,6 +96,8 @@ export default function SchedulePage() {
   async function handleCreateAvailability() {
     if (!user || !modal.start || !modal.end) return;
 
+    const count = Math.max(2, Math.min(52, modal.repeatCount || 2));
+
     const base = {
       userId: user.uid,
       userEmail: user.email,
@@ -116,7 +118,7 @@ export default function SchedulePage() {
       const batch = writeBatch(db);
       const unit = modal.recurrence === "weekly" ? "week" : "month";
 
-      for (let i = 0; i < modal.repeatCount; i++) {
+      for (let i = 0; i < count; i++) {
         const start = dayjs(modal.start).add(i, unit).toDate();
         const end = dayjs(modal.end).add(i, unit).toDate();
         const ref = doc(collection(db, "availabilities"));
@@ -224,8 +226,8 @@ export default function SchedulePage() {
               Register Availability
             </h2>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <div className="flex-1">
                 <label htmlFor="modal-start" className="block text-sm font-medium text-gray-700">
                   Start
                 </label>
@@ -239,7 +241,7 @@ export default function SchedulePage() {
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
-              <div>
+              <div className="flex-1">
                 <label htmlFor="modal-end" className="block text-sm font-medium text-gray-700">
                   End
                 </label>
@@ -316,17 +318,22 @@ export default function SchedulePage() {
                   max={52}
                   value={modal.repeatCount}
                   onChange={(e) =>
-                    setModal((prev) => ({
-                      ...prev,
-                      repeatCount: Math.max(2, Math.min(52, Number(e.target.value))),
-                    }))
+                    setModal((prev) => ({ ...prev, repeatCount: Number(e.target.value) }))
                   }
-                  className="mt-1 w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={`mt-1 w-20 rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 ${
+                    modal.repeatCount >= 2
+                      ? "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      : "border-red-300 focus:border-red-500 focus:ring-red-500"
+                  }`}
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Creates {modal.repeatCount} slots,{" "}
-                  {modal.recurrence === "weekly" ? "one per week" : "one per month"}
-                </p>
+                {modal.repeatCount < 2 ? (
+                  <p className="mt-1 text-xs text-red-500">Must be at least 2 for recurring events</p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-400">
+                    Creates {modal.repeatCount} slots,{" "}
+                    {modal.recurrence === "weekly" ? "one per week" : "one per month"}
+                  </p>
+                )}
               </div>
             )}
 
@@ -339,7 +346,8 @@ export default function SchedulePage() {
               </button>
               <button
                 onClick={handleCreateAvailability}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                disabled={modal.recurrence !== "none" && modal.repeatCount < 2}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {modal.recurrence !== "none"
                   ? `Create ${modal.repeatCount} Slots`

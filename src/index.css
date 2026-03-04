@@ -21,64 +21,35 @@ body {
   font-size: 0.95rem;
 }
 
-.rbc-toolbar {
+.rbc-time-header > .rbc-row > *:first-child,
+.rbc-time-header .rbc-label {
+  max-width: 50px;
+  min-width: 50px;
+  width: 50px;
+  flex: 0 0 50px;
+}
+
+.rbc-time-gutter {
+  max-width: 50px;
+  min-width: 50px;
+  width: 50px;
+}
+
+
+.rbc-time-gutter .rbc-timeslot-group .rbc-time-slot:last-child {
+  display: none;
+}
+
+.rbc-time-gutter .rbc-timeslot-group .rbc-time-slot {
+  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  justify-content: center;
+}
+
+.rbc-time-gutter .rbc-timeslot-group .rbc-time-slot .rbc-label {
   font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
 }
 
-.rbc-toolbar button {
-  padding: 6px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #374151;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  line-height: 1.5;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-
-.rbc-toolbar button:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
-}
-
-.rbc-toolbar button.rbc-active {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-}
-
-.rbc-toolbar button.rbc-active:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-}
-
-.rbc-btn-group {
-  display: inline-flex;
-  gap: 4px;
-}
-
-@media (max-width: 640px) {
-  .rbc-toolbar {
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-  }
-
-  .rbc-toolbar button {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-  }
-
-  .rbc-toolbar .rbc-toolbar-label {
-    width: 100%;
-    text-align: center;
-    order: -1;
-    font-weight: 600;
-  }
-}
