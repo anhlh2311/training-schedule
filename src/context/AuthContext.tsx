@@ -110,31 +110,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    let unsubscribe: (() => void) | null = null;
+
     getRedirectResult(auth)
       .then((result) => {
-        if (result?.user) {
+        if (mounted && result?.user) {
           return upsertUserDoc(result.user);
         }
       })
       .catch(() => {
         // Redirect errors (e.g. user cancelled) are handled silently
+      })
+      .finally(() => {
+        if (!mounted) return;
+        unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          setUser(firebaseUser);
+          if (!firebaseUser) {
+            setAppUser(null);
+          } else {
+            await upsertUserDoc(firebaseUser);
+          }
+          setLoading(false);
+        });
       });
-  }, []);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-
-      if (!firebaseUser) {
-        setAppUser(null);
-        setLoading(false);
-        return;
-      }
-
-      await upsertUserDoc(firebaseUser);
-      setLoading(false);
-    });
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      unsubscribe?.();
+    };
   }, []);
 
   useEffect(() => {
