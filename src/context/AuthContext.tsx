@@ -33,6 +33,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isTrainer: boolean;
+  isEmbeddedBrowser: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -85,12 +86,22 @@ async function upsertUserDoc(firebaseUser: User): Promise<void> {
   }
 }
 
-function isMobileOrEmbedded(): boolean {
+const EMBEDDED_BROWSER_PATTERNS = [
+  "fban", "fbav", "instagram", "twitter", "linkedinapp", "whatsapp",
+  "line", "kakaotalk", "slack", "wechat", "snapchat", "tiktok",
+  "pinterest", "telegram", "messenger", "wv", "webview",
+];
+
+function isEmbeddedBrowser(): boolean {
   if (typeof window === "undefined") return false;
   const ua = navigator.userAgent.toLowerCase();
-  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
-  const isEmbedded = !window.opener && window.parent !== window;
-  return isMobile || isEmbedded;
+  return EMBEDDED_BROWSER_PATTERNS.some((p) => ua.includes(p));
+}
+
+function isMobileRealBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return /android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini/i.test(ua);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -148,9 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = appUser?.role === "admin";
   const isTrainer = appUser?.role === "trainer" || appUser?.role === "admin";
+  const isEmbeddedBrowserFlag = isEmbeddedBrowser();
 
   async function signInWithGoogle() {
-    if (isMobileOrEmbedded()) {
+    if (isEmbeddedBrowserFlag) {
+      return;
+    }
+    if (isMobileRealBrowser()) {
       await signInWithRedirect(auth, googleProvider);
       return;
     }
@@ -175,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isAdmin,
         isTrainer,
+        isEmbeddedBrowser: isEmbeddedBrowserFlag,
         signInWithGoogle,
         signOut,
       }}
