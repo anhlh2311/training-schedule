@@ -43,20 +43,20 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500">
-          View all registered availability across the team
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Team Availability</h1>
+        <p className="mt-1 text-sm text-gray-400">
+          View all registered training sessions across the team
         </p>
       </div>
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <CalendarView events={events} />
       </div>
     </div>

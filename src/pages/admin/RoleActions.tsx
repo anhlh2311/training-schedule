@@ -42,11 +42,11 @@ export default function RoleActions({ target }: RoleActionsProps) {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {target.role === "user" && (currentRole === "admin" || currentRole === "trainer") && (
           <button
             onClick={() => prompt("trainer", "Make Trainer")}
-            className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 transition hover:bg-green-100"
+            className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-600 transition hover:bg-emerald-100"
           >
             Make Trainer
           </button>
@@ -56,13 +56,13 @@ export default function RoleActions({ target }: RoleActionsProps) {
           <>
             <button
               onClick={() => prompt("user", "Remove Trainer")}
-              className="rounded-md bg-red-50 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
+              className="rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-500 transition hover:bg-red-100"
             >
               Remove Trainer
             </button>
             <button
               onClick={() => prompt("admin", "Make Admin")}
-              className="rounded-md bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700 transition hover:bg-purple-100"
+              className="rounded-lg bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-600 transition hover:bg-violet-100"
             >
               Make Admin
             </button>
@@ -72,7 +72,7 @@ export default function RoleActions({ target }: RoleActionsProps) {
         {target.role === "admin" && isSelf && (
           <button
             onClick={() => prompt("trainer", "Renounce Admin")}
-            className="rounded-md bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 transition hover:bg-amber-100"
+            className="rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-600 transition hover:bg-amber-100"
           >
             Renounce Admin
           </button>
@@ -81,39 +81,47 @@ export default function RoleActions({ target }: RoleActionsProps) {
 
       {confirm.open &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+            onClick={() => setConfirm({ open: false, newRole: "user", label: "" })}
+          >
+            <div className="modal-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div
+              className="modal-panel relative mx-0 w-full rounded-t-3xl bg-white px-6 pb-8 pt-6 shadow-2xl sm:mx-4 sm:max-w-sm sm:rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
               <h2 className="text-lg font-semibold text-gray-900">
                 {confirm.label}
               </h2>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm leading-relaxed text-gray-500">
                 {isSelf ? (
                   <>
                     Are you sure you want to renounce your admin privileges? You
-                    will be demoted to <strong>trainer</strong>.
+                    will be demoted to <span className="font-medium text-gray-700">trainer</span>.
                   </>
                 ) : (
                   <>
                     Change{" "}
-                    <strong>{target.displayName || target.email}</strong>'s
-                    role to <strong>{confirm.newRole}</strong>?
+                    <span className="font-medium text-gray-700">{target.displayName || target.email}</span>'s
+                    role to <span className="font-medium text-gray-700">{confirm.newRole}</span>?
                   </>
                 )}
               </p>
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex gap-3">
                 <button
                   onClick={() =>
                     setConfirm({ open: false, newRole: "user", label: "" })
                   }
                   disabled={updating}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+                  className="flex-1 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 active:scale-[0.98] disabled:opacity-40"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirm}
                   disabled={updating}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-40"
                 >
                   {updating ? "Updating..." : "Confirm"}
                 </button>

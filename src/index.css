@@ -6,19 +6,152 @@ body {
   min-height: 100vh;
 }
 
-.rbc-today {
-  background-color: #eef6ff;
-  border-right: 1px solid #ddd;
+/* ------------------------------------------------------------------ */
+/*  Modal animations                                                   */
+/* ------------------------------------------------------------------ */
+
+@keyframes modal-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop {
+  animation: modal-fade-in 0.2s ease-out;
+}
+
+.modal-panel {
+  animation: modal-slide-up 0.3s ease-out;
+}
+
+@media (min-width: 640px) {
+  .modal-panel {
+    animation: modal-scale-in 0.25s ease-out;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Calendar – global overrides                                        */
+/* ------------------------------------------------------------------ */
+
+.rbc-calendar {
+  font-family: inherit;
 }
 
 .rbc-allday-cell {
   display: none;
 }
 
+/* Softer grid borders */
+.rbc-time-view,
+.rbc-month-view {
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rbc-time-content,
+.rbc-month-view .rbc-month-row + .rbc-month-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+.rbc-time-content > * + * > * {
+  border-left: 1px solid #f1f5f9;
+}
+
+.rbc-timeslot-group {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rbc-day-slot .rbc-time-slot {
+  border-top: none;
+}
+
+.rbc-month-view .rbc-header {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rbc-month-view .rbc-date-cell {
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.rbc-month-row {
+  border: none;
+}
+
+.rbc-month-view .rbc-day-bg + .rbc-day-bg {
+  border-left: 1px solid #f1f5f9;
+}
+
+.rbc-off-range-bg {
+  background: #fafbfc;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Today highlight                                                    */
+/* ------------------------------------------------------------------ */
+
+.rbc-today {
+  background-color: #eff6ff;
+  border-right: 1px solid #f1f5f9;
+}
+
+.rbc-month-view .rbc-now .rbc-button-link {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 9999px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Time view – headers                                                */
+/* ------------------------------------------------------------------ */
+
 .rbc-time-view .rbc-header {
   border-bottom: none;
   padding: 12px 0;
   font-size: 0.95rem;
+}
+
+.rbc-time-header {
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rbc-time-header > .rbc-row > *:first-child,
@@ -29,12 +162,16 @@ body {
   flex: 0 0 50px;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Time gutter                                                        */
+/* ------------------------------------------------------------------ */
+
 .rbc-time-gutter {
   max-width: 50px;
   min-width: 50px;
   width: 50px;
+  background: #fafbfc;
 }
-
 
 .rbc-time-gutter .rbc-timeslot-group .rbc-time-slot:last-child {
   display: none;
@@ -48,8 +185,72 @@ body {
 }
 
 .rbc-time-gutter .rbc-timeslot-group .rbc-time-slot .rbc-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #111827;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Events – softer pill style                                         */
+/* ------------------------------------------------------------------ */
+
+.rbc-event {
+  border-radius: 8px !important;
+  border: none !important;
+  padding: 3px 8px !important;
+  font-size: 0.78rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.rbc-event:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.rbc-event-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.rbc-show-more {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Current time indicator                                             */
+/* ------------------------------------------------------------------ */
+
+.rbc-current-time-indicator {
+  background-color: #ef4444;
+  height: 2px;
+}
+
+.rbc-current-time-indicator::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Selection range                                                    */
+/* ------------------------------------------------------------------ */
+
+.rbc-slot-selection {
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px dashed rgba(37, 99, 235, 0.4);
+  border-radius: 6px;
+  color: #1e40af;
+  font-weight: 600;
+  font-size: 0.8rem;
+}

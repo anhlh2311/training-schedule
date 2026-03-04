@@ -44,18 +44,17 @@ export default function TrainersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Trainers</h1>
-        <p className="text-sm text-gray-500">
-          {trainers.length} trainer{trainers.length !== 1 && "s"} and admin
-          {trainers.length !== 1 && "s"}
+        <p className="mt-1 text-sm text-gray-400">
+          {trainers.length} trainer{trainers.length !== 1 && "s"} and admin{trainers.length !== 1 && "s"}
         </p>
       </div>
       <UserTable users={trainers} />

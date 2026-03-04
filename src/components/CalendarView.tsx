@@ -51,25 +51,25 @@ function CustomHeader({ date }: HeaderProps) {
 
 const VIEW_STYLES: Record<string, { active: string; inactive: string }> = {
   month: {
-    active:  "border-violet-600 bg-violet-600 text-white hover:bg-violet-700",
-    inactive: "border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100",
+    active:  "bg-violet-600 text-white shadow-sm hover:bg-violet-700 active:scale-[0.97]",
+    inactive: "bg-violet-50 text-violet-600 hover:bg-violet-100 active:scale-[0.97]",
   },
   week: {
-    active:  "border-blue-600 bg-blue-600 text-white hover:bg-blue-700",
-    inactive: "border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100",
+    active:  "bg-blue-600 text-white shadow-sm hover:bg-blue-700 active:scale-[0.97]",
+    inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 active:scale-[0.97]",
   },
   day: {
-    active:  "border-teal-600 bg-teal-600 text-white hover:bg-teal-700",
-    inactive: "border-teal-200 bg-teal-50 text-teal-600 hover:bg-teal-100",
+    active:  "bg-teal-600 text-white shadow-sm hover:bg-teal-700 active:scale-[0.97]",
+    inactive: "bg-teal-50 text-teal-600 hover:bg-teal-100 active:scale-[0.97]",
   },
 };
 
 const VIEW_LABELS: Record<string, string> = { month: "Month", week: "Week", day: "Day" };
 
-function CustomToolbar({ label, onNavigate, onView, view, views }: ToolbarProps) {
+function CustomToolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalendarEvent, object>) {
   const btnBase =
-    "inline-flex items-center justify-center rounded-lg border text-sm font-medium transition h-10 min-w-[40px] px-4";
-  const navBtn = `${btnBase} border-gray-300 bg-white text-gray-700 hover:bg-gray-100`;
+    "inline-flex items-center justify-center rounded-xl text-sm font-medium transition h-10 min-w-[40px] px-4";
+  const navBtn = `${btnBase} bg-gray-50 text-gray-600 hover:bg-gray-100 active:scale-[0.97]`;
 
   return (
     <div className="mb-3 flex flex-col items-center gap-2">
@@ -111,21 +111,25 @@ function CustomToolbar({ label, onNavigate, onView, view, views }: ToolbarProps)
 
 function CustomEvent({ event }: EventProps<CalendarEvent>) {
   const photoURL = event.resource?.userPhotoURL;
+  const color = getUserColor(event.resource.userId);
   return (
     <div className="flex items-center gap-1.5 overflow-hidden">
       {photoURL ? (
         <img
           src={photoURL}
           alt=""
-          className="h-4 w-4 shrink-0 rounded-full"
+          className="h-4 w-4 shrink-0 rounded-full ring-1 ring-white"
           referrerPolicy="no-referrer"
         />
       ) : (
-        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/30 text-[8px] font-bold">
+        <div
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white"
+          style={{ backgroundColor: color }}
+        >
           {event.resource?.userName?.[0] ?? "?"}
         </div>
       )}
-      <span className="truncate">{event.title}</span>
+      <span className="truncate" style={{ color }}>{event.title}</span>
     </div>
   );
 }
@@ -197,7 +201,7 @@ function MobileDayView({
   }, [events]);
 
   const btnBase =
-    "inline-flex items-center justify-center rounded-lg border text-sm font-medium transition h-10 min-w-[40px] px-4";
+    "inline-flex items-center justify-center rounded-xl text-sm font-medium transition h-10 min-w-[40px] px-4";
 
   return (
     <div className="flex flex-col">
@@ -221,7 +225,7 @@ function MobileDayView({
       <div className="flex items-center justify-between px-1 pb-3">
         <button
           onClick={() => onNavigateWeek("prev")}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+          className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 active:scale-[0.95]"
           aria-label="Previous week"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -235,7 +239,7 @@ function MobileDayView({
           {!selectedDate.isSame(today, "week") && (
             <button
               onClick={() => onNavigateWeek("today")}
-              className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200"
+              className="rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100"
             >
               Today
             </button>
@@ -243,7 +247,7 @@ function MobileDayView({
         </div>
         <button
           onClick={() => onNavigateWeek("next")}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+          className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 active:scale-[0.95]"
           aria-label="Next week"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -412,12 +416,13 @@ export default function CalendarView({
     const color = getUserColor(event.resource.userId);
     return {
       style: {
-        backgroundColor: color,
-        borderRadius: "6px",
-        border: "none",
-        color: "#fff",
-        fontSize: "0.8rem",
-        padding: "2px 6px",
+        backgroundColor: `${color}18`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: "8px",
+        color: color,
+        fontSize: "0.78rem",
+        fontWeight: 600,
+        padding: "3px 8px",
       },
     };
   }, []);

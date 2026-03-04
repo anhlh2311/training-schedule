@@ -97,7 +97,7 @@ export default function UsersPage() {
         body: JSON.stringify({ email }),
       });
     } catch {
-      // Email notification is best-effort; invite is saved regardless
+      // Email notification is best-effort
     }
 
     setInviteEmail("");
@@ -111,30 +111,30 @@ export default function UsersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">All Users</h1>
-        <p className="text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-400">
           {users.length} user{users.length !== 1 && "s"} have signed in
         </p>
       </div>
 
       {isAdmin && (
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-sm font-semibold text-gray-900">
             Pre-register Trainer
           </h2>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs leading-relaxed text-gray-400">
             Enter an email address to pre-assign the trainer role. When this
             person signs in with Google, they'll get trainer access immediately.
           </p>
-          <form onSubmit={handleInvite} className="mt-3 flex gap-3">
+          <form onSubmit={handleInvite} className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input
               type="email"
               value={inviteEmail}
@@ -144,40 +144,40 @@ export default function UsersPage() {
               }}
               placeholder="trainer@example.com"
               required
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-40"
             >
               {submitting ? "Adding..." : "Add Invite"}
             </button>
           </form>
           {inviteError && (
-            <p className="mt-2 text-xs text-red-600">{inviteError}</p>
+            <p className="mt-2 text-xs text-red-400">{inviteError}</p>
           )}
 
           {invites.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500">
+            <div className="mt-5">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Pending Invites
               </h3>
-              <div className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
-                {invites.map((inv) => (
+              <div className="mt-2 overflow-hidden rounded-xl border border-gray-100">
+                {invites.map((inv, idx) => (
                   <div
                     key={inv.email}
-                    className="flex items-center justify-between px-4 py-2.5"
+                    className={`flex items-center justify-between px-4 py-3 ${idx !== invites.length - 1 ? "border-b border-gray-50" : ""}`}
                   >
-                    <div>
-                      <span className="text-sm text-gray-900">{inv.email}</span>
-                      <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{inv.email}</span>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
                         {inv.role}
                       </span>
                     </div>
                     <button
                       onClick={() => handleRevokeInvite(inv.email)}
-                      className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 transition hover:bg-red-100 active:scale-[0.97]"
                     >
                       Revoke
                     </button>

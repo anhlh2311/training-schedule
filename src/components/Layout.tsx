@@ -27,6 +27,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const badge = appUser ? ROLE_BADGE[appUser.role] : null;
 
+  function mobileIconClass(path: string) {
+    return `rounded-lg p-2 transition ${
+      isActive(path)
+        ? "text-blue-600"
+        : "text-gray-400 hover:text-gray-600"
+    }`;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="relative z-30 border-b border-gray-200 bg-white shadow-sm">
@@ -39,7 +47,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Desktop nav */}
             <div className="hidden md:flex md:gap-1">
-              <Link to="/" className={navLinkClass("/")}>Dashboard</Link>
+              <Link to="/" className={navLinkClass("/")}>Team Availability</Link>
 
               {isTrainer && (
                 <Link to="/schedule" className={navLinkClass("/schedule")}>My Schedule</Link>
@@ -53,6 +61,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
+          </div>
+
+          {/* Right side: mobile icons + hamburger, desktop user info */}
+          <div className="flex items-center gap-0.5 md:hidden">
+            <Link to="/" className={mobileIconClass("/")} aria-label="Home">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+              </svg>
+            </Link>
+
+            {isTrainer && (
+              <Link to="/schedule" className={mobileIconClass("/schedule")} aria-label="My Schedule">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+              </Link>
+            )}
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
           </div>
 
           {/* Desktop user info */}
@@ -85,22 +127,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen((v) => !v)}
-            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 md:hidden"
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
-          </button>
         </div>
 
         {/* Mobile menu panel — overlays content */}
@@ -113,21 +139,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </>
         )}
         {mobileOpen && (
-          <div className="absolute left-0 right-0 z-20 border-t border-gray-200 bg-white px-4 pb-4 pt-2 shadow-lg md:hidden">
+          <div className="modal-panel absolute left-0 right-0 z-20 border-t border-gray-200 bg-white px-4 pb-4 pt-2 shadow-lg md:hidden">
             <div className="flex flex-col gap-1">
-              <Link to="/" className={navLinkClass("/")} onClick={() => setMobileOpen(false)}>
-                Dashboard
-              </Link>
-
-              {isTrainer && (
-                <Link to="/schedule" className={navLinkClass("/schedule")} onClick={() => setMobileOpen(false)}>
-                  My Schedule
-                </Link>
-              )}
-
               {isTrainer && (
                 <>
-                  <div className="my-1 h-px bg-gray-200" />
                   <Link to="/admin/users" className={navLinkClass("/admin/users")} onClick={() => setMobileOpen(false)}>
                     Users
                   </Link>
@@ -139,7 +154,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             {user && (
-              <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3">
+              <div className={`flex items-center justify-between ${isTrainer ? "mt-3 border-t border-gray-200 pt-3" : ""}`}>
                 <div className="flex items-center gap-2">
                   {user.photoURL && (
                     <img

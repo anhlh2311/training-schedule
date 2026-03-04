@@ -2,9 +2,9 @@ import type { AppUser } from "../../types";
 import RoleActions from "./RoleActions";
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
-  admin: { label: "Admin", className: "bg-purple-100 text-purple-700" },
-  trainer: { label: "Trainer", className: "bg-green-100 text-green-700" },
-  user: { label: "User", className: "bg-gray-100 text-gray-600" },
+  admin: { label: "Admin", className: "bg-violet-50 text-violet-600" },
+  trainer: { label: "Trainer", className: "bg-emerald-50 text-emerald-600" },
+  user: { label: "User", className: "bg-slate-100 text-slate-500" },
 };
 
 interface UserTableProps {
@@ -14,50 +14,53 @@ interface UserTableProps {
 export default function UserTable({ users }: UserTableProps) {
   if (users.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-gray-500">No users found.</p>
+      <p className="py-12 text-center text-sm text-gray-400">No users found.</p>
     );
   }
 
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm md:block">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+      <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:block">
+        <table className="min-w-full">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50/60">
+              <th className="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 User
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Role
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Last Login
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {users.map((u) => {
+          <tbody>
+            {users.map((u, idx) => {
               const badge = ROLE_BADGE[u.role];
               return (
-                <tr key={u.uid} className="hover:bg-gray-50">
+                <tr
+                  key={u.uid}
+                  className={`transition hover:bg-gray-50/70 ${idx !== users.length - 1 ? "border-b border-gray-50" : ""}`}
+                >
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center gap-3">
                       {u.photoURL ? (
                         <img
                           src={u.photoURL}
                           alt=""
-                          className="h-8 w-8 rounded-full"
+                          className="h-9 w-9 rounded-full ring-2 ring-white"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-sm font-semibold text-gray-500">
                           {u.displayName?.[0] ?? "?"}
                         </div>
                       )}
@@ -66,17 +69,17 @@ export default function UserTable({ users }: UserTableProps) {
                       </span>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-400">
                     {u.email}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${badge.className}`}
                     >
                       {badge.label}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-400">
                     {u.lastLoginAt?.toLocaleDateString() ?? "—"}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
@@ -96,36 +99,36 @@ export default function UserTable({ users }: UserTableProps) {
           return (
             <div
               key={u.uid}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+              className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
             >
               <div className="flex items-center gap-3">
                 {u.photoURL ? (
                   <img
                     src={u.photoURL}
                     alt=""
-                    className="h-10 w-10 rounded-full"
+                    className="h-11 w-11 rounded-full ring-2 ring-white"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-sm font-semibold text-gray-500">
                     {u.displayName?.[0] ?? "?"}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">
+                  <p className="truncate text-sm font-semibold text-gray-900">
                     {u.displayName || "—"}
                   </p>
-                  <p className="truncate text-xs text-gray-500">{u.email}</p>
+                  <p className="truncate text-xs text-gray-400">{u.email}</p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${badge.className}`}
                 >
                   {badge.label}
                 </span>
               </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-                <span className="text-xs text-gray-400">
+              <div className="mt-3 flex items-center justify-between border-t border-gray-50 pt-3">
+                <span className="text-[11px] text-gray-400">
                   Last login: {u.lastLoginAt?.toLocaleDateString() ?? "—"}
                 </span>
                 <RoleActions target={u} />
