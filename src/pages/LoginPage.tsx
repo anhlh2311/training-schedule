@@ -13,8 +13,8 @@ export default function LoginPage() {
   }, [user, loading, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-xl">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl sm:p-10">
         <div className="mb-8 text-center">
           <img
             src="/IHN.png"

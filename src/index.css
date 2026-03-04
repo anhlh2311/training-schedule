@@ -62,3 +62,23 @@ body {
   display: inline-flex;
   gap: 4px;
 }
+
+@media (max-width: 640px) {
+  .rbc-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .rbc-toolbar button {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+
+  .rbc-toolbar .rbc-toolbar-label {
+    width: 100%;
+    text-align: center;
+    order: -1;
+    font-weight: 600;
+  }
+}

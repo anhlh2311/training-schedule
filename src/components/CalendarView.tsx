@@ -45,7 +45,10 @@ interface CalendarViewProps {
   selectable?: boolean;
   onSelectSlot?: (slotInfo: SlotInfo) => void;
   onSelectEvent?: (event: CalendarEvent) => void;
-  initialView?: View;
+}
+
+function getDefaultView(): View {
+  return window.innerWidth < 768 ? "day" : "week";
 }
 
 export default function CalendarView({
@@ -53,9 +56,8 @@ export default function CalendarView({
   selectable = false,
   onSelectSlot,
   onSelectEvent,
-  initialView = "week",
 }: CalendarViewProps) {
-  const [view, setView] = useState<View>(initialView);
+  const [view, setView] = useState<View>(getDefaultView);
   const [date, setDate] = useState<Date>(new Date());
 
   const handleNavigate = useCallback((newDate: Date, _view: View, _action: NavigateAction) => {

@@ -157,6 +157,21 @@ export default function SchedulePage() {
     setDeleteModal({ open: false });
   }
 
+  function openManualModal() {
+    const now = dayjs();
+    const start = now.minute(0).second(0).add(1, "hour").toDate();
+    const end = dayjs(start).add(1, "hour").toDate();
+    setModal({ ...INITIAL_MODAL, open: true, start, end });
+  }
+
+  function toDatetimeLocal(d: Date): string {
+    return dayjs(d).format("YYYY-MM-DDTHH:mm");
+  }
+
+  function fromDatetimeLocal(val: string): Date {
+    return dayjs(val).toDate();
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -168,12 +183,17 @@ export default function SchedulePage() {
   const hasRecurrenceGroup = deleteModal.event?.resource.recurrenceGroupId;
 
   return (
-    <div>
+    <div className="relative">
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900">My Schedule</h1>
         <p className="text-sm text-gray-500">
-          Click or drag on the calendar to register your availability. Click an
-          existing slot to remove it.
+          <span className="hidden md:inline">
+            Click or drag on the calendar to register your availability. Click an
+            existing slot to remove it.
+          </span>
+          <span className="md:hidden">
+            Tap an existing slot to remove it, or use the + button to add availability.
+          </span>
         </p>
       </div>
 
@@ -186,16 +206,54 @@ export default function SchedulePage() {
         />
       </div>
 
+      {/* Mobile FAB */}
+      <button
+        onClick={openManualModal}
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95 md:hidden"
+        aria-label="Add availability"
+      >
+        <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </button>
+
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">
               Register Availability
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              {modal.start?.toLocaleString()} &mdash;{" "}
-              {modal.end?.toLocaleString()}
-            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="modal-start" className="block text-sm font-medium text-gray-700">
+                  Start
+                </label>
+                <input
+                  id="modal-start"
+                  type="datetime-local"
+                  value={modal.start ? toDatetimeLocal(modal.start) : ""}
+                  onChange={(e) =>
+                    setModal((prev) => ({ ...prev, start: fromDatetimeLocal(e.target.value) }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-end" className="block text-sm font-medium text-gray-700">
+                  End
+                </label>
+                <input
+                  id="modal-end"
+                  type="datetime-local"
+                  value={modal.end ? toDatetimeLocal(modal.end) : ""}
+                  onChange={(e) =>
+                    setModal((prev) => ({ ...prev, end: fromDatetimeLocal(e.target.value) }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
 
             <div className="mt-4">
               <label
@@ -294,7 +352,7 @@ export default function SchedulePage() {
 
       {deleteModal.open && deleteModal.event && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">
               Remove Availability
             </h2>
