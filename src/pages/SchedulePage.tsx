@@ -37,7 +37,7 @@ const INITIAL_MODAL: CreateModal = {
 };
 
 export default function SchedulePage() {
-  const { user } = useAuth();
+  const { user, appUser } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<CreateModal>(INITIAL_MODAL);
@@ -101,7 +101,7 @@ export default function SchedulePage() {
     const base = {
       userId: user.uid,
       userEmail: user.email,
-      userName: user.displayName || "Anonymous",
+      userName: appUser?.displayName || user.displayName || "Anonymous",
       userPhotoURL: user.photoURL || "",
       title: modal.title,
       createdAt: Timestamp.now(),

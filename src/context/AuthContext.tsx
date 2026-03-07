@@ -9,16 +9,22 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
+  updateProfile,
   type User,
 } from "firebase/auth";
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   Timestamp,
+  where,
+  writeBatch,
 } from "firebase/firestore";
 import { auth, googleProvider, db } from "../lib/firebase";
 import type { AppUser, UserRole } from "../types";
@@ -34,6 +40,7 @@ interface AuthContextType {
   isEmbeddedBrowser: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -154,6 +161,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
   }
 
+  async function updateDisplayName(displayName: string) {
+    if (!user) return;
+    const trimmed = displayName.trim();
+    if (!trimmed) return;
+
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { displayName: trimmed });
+    await updateProfile(user, { displayName: trimmed });
+
+    const availabilitiesQuery = query(
+      collection(db, "availabilities"),
+      where("userId", "==", user.uid)
+    );
+    const snap = await getDocs(availabilitiesQuery);
+    if (snap.empty) return;
+
+    const BATCH_SIZE = 500;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      for (const d of chunk) {
+        batch.update(d.ref, { userName: trimmed });
+      }
+      await batch.commit();
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -165,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isEmbeddedBrowser: isEmbeddedBrowserFlag,
         signInWithGoogle,
         signOut,
+        updateDisplayName,
       }}
     >
       {children}
