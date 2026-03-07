@@ -32,5 +32,7 @@ export interface CalendarEvent {
     userName: string;
     userPhotoURL?: string;
     recurrenceGroupId?: string | null;
+    /** When present, event represents multiple trainers in the same slot (grouped for display) */
+    users?: Array<{ userId: string; userName: string; userPhotoURL?: string }>;
   };
 }

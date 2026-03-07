@@ -21,6 +21,7 @@ A React app for teams to register and view training availability on a shared cal
 2. Navigate to **Authentication > Sign-in method** and enable **Google**
 3. Navigate to **Firestore Database** and create a database (start in **test mode** for development)
 4. Go to **Project settings > General** and copy your web app config
+5. Deploy security rules: run `firebase deploy --only firestore:rules` (requires `firebase init` if not set up), or paste [firestore.rules](firestore.rules) into Firebase Console > Firestore > Rules
 
 ## Getting Started
 

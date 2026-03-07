@@ -36,6 +36,15 @@ const INITIAL_MODAL: CreateModal = {
   repeatCount: 4,
 };
 
+function rangesOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
+}
+
 export default function SchedulePage() {
   const { user, appUser } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -45,6 +54,7 @@ export default function SchedulePage() {
     open: boolean;
     event?: CalendarEvent;
   }>({ open: false });
+  const [createError, setCreateError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -81,6 +91,7 @@ export default function SchedulePage() {
   }, [user]);
 
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
+    setCreateError("");
     setModal({
       ...INITIAL_MODAL,
       open: true,
@@ -96,7 +107,30 @@ export default function SchedulePage() {
   async function handleCreateAvailability() {
     if (!user || !modal.start || !modal.end) return;
 
+    setCreateError("");
+
     const count = Math.max(2, Math.min(52, modal.repeatCount || 2));
+    const unit = modal.recurrence === "weekly" ? "week" : "month";
+
+    const proposedSlots: { start: Date; end: Date }[] =
+      modal.recurrence === "none"
+        ? [{ start: modal.start, end: modal.end }]
+        : Array.from({ length: count }, (_, i) => {
+            const start = dayjs(modal.start).add(i, unit).toDate();
+            const end = dayjs(modal.end).add(i, unit).toDate();
+            return { start, end };
+          });
+
+    const hasOverlap = proposedSlots.some((slot) =>
+      events.some((ev) =>
+        rangesOverlap(slot.start, slot.end, ev.start, ev.end)
+      )
+    );
+
+    if (hasOverlap) {
+      setCreateError("This time slot overlaps with an existing availability. Please choose a different time.");
+      return;
+    }
 
     const base = {
       userId: user.uid,
@@ -116,7 +150,6 @@ export default function SchedulePage() {
     } else {
       const groupId = crypto.randomUUID();
       const batch = writeBatch(db);
-      const unit = modal.recurrence === "weekly" ? "week" : "month";
 
       for (let i = 0; i < count; i++) {
         const start = dayjs(modal.start).add(i, unit).toDate();
@@ -160,6 +193,7 @@ export default function SchedulePage() {
   }
 
   function openManualModal() {
+    setCreateError("");
     const now = dayjs();
     const start = now.minute(0).second(0).add(1, "hour").toDate();
     const end = dayjs(start).add(1, "hour").toDate();
@@ -189,11 +223,11 @@ export default function SchedulePage() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900">My Schedule</h1>
         <p className="text-sm text-gray-500">
-          <span className="hidden md:inline">
-            Click or drag on the calendar to register your availability. Click an
+          <span className="hidden sm:inline">
+            Click or drag on the calendar to register your availability, or use the + button. Click an
             existing slot to remove it.
           </span>
-          <span className="md:hidden">
+          <span className="sm:hidden">
             Tap an existing slot to remove it, or use the + button to add availability.
           </span>
         </p>
@@ -211,7 +245,7 @@ export default function SchedulePage() {
       {/* Mobile FAB */}
       <button
         onClick={openManualModal}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95 md:hidden"
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
         aria-label="Add availability"
       >
         <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -220,7 +254,7 @@ export default function SchedulePage() {
       </button>
 
       {modal.open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => setModal(INITIAL_MODAL)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => { setModal(INITIAL_MODAL); setCreateError(""); }}>
           <div className="modal-backdrop absolute inset-0 bg-black/30 backdrop-blur-sm" />
           <div
             className="modal-panel relative mx-0 w-full rounded-t-3xl bg-white px-6 pb-8 pt-6 shadow-2xl sm:mx-4 sm:max-w-lg sm:rounded-3xl"
@@ -342,9 +376,15 @@ export default function SchedulePage() {
               </div>
             )}
 
+            {createError && (
+              <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                {createError}
+              </p>
+            )}
+
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => setModal(INITIAL_MODAL)}
+                onClick={() => { setModal(INITIAL_MODAL); setCreateError(""); }}
                 className="flex-1 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 active:scale-[0.98]"
               >
                 Cancel

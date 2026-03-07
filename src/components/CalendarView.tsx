@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, dayjsLocalizer, type SlotInfo, type View, type EventProps, type HeaderProps, type ToolbarProps } from "react-big-calendar";
 import dayjs from "dayjs";
 import "dayjs/locale/en-gb";
@@ -74,6 +75,40 @@ function formatDuration(start: Date, end: Date): string {
   return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
 
+/** Merge events with identical start/end into grouped events for cleaner display */
+function mergeOverlappingEvents(events: CalendarEvent[]): CalendarEvent[] {
+  const bySlot = new Map<string, CalendarEvent[]>();
+  for (const ev of events) {
+    const key = `${ev.start.getTime()}-${ev.end.getTime()}`;
+    const arr = bySlot.get(key);
+    if (arr) arr.push(ev);
+    else bySlot.set(key, [ev]);
+  }
+  const result: CalendarEvent[] = [];
+  for (const group of bySlot.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+    } else {
+      const first = group[0];
+      result.push({
+        id: `group-${first.start.getTime()}-${first.end.getTime()}`,
+        title: group.map((e) => e.resource.userName).join(", "),
+        start: first.start,
+        end: first.end,
+        resource: {
+          ...first.resource,
+          users: group.map((e) => ({
+            userId: e.resource.userId,
+            userName: e.resource.userName,
+            userPhotoURL: e.resource.userPhotoURL ?? "",
+          })),
+        },
+      });
+    }
+  }
+  return result.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
 /* ------------------------------------------------------------------ */
 /*  react-big-calendar custom components                               */
 /* ------------------------------------------------------------------ */
@@ -122,8 +157,8 @@ function CustomToolbar({ label, onNavigate, onView, view, views, date }: Toolbar
 
   return (
     <div className="mb-3 flex flex-col items-center gap-2">
-      {/* Row 1: View buttons (Month, Week, Day) */}
-      <div className="flex items-center gap-1.5">
+      {/* Row 1: View buttons + optional Add button */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         {(views as View[]).map((v) => {
           const colors = VIEW_STYLES[v] ?? VIEW_STYLES.week;
           return (
@@ -161,8 +196,134 @@ function CustomToolbar({ label, onNavigate, onView, view, views, date }: Toolbar
 }
 
 function CustomEvent({ event }: EventProps<CalendarEvent>) {
+  const users = event.resource?.users;
+  const isGrouped = users && users.length > 1;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [showPopover, setShowPopover] = useState(false);
+  const [openedByClick, setOpenedByClick] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    clearHideTimer();
+    setOpenedByClick(false);
+    setShowPopover(true);
+  }, [clearHideTimer]);
+
+  const handleMouseLeave = useCallback(() => {
+    hideTimerRef.current = setTimeout(() => setShowPopover(false), 150);
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearHideTimer();
+    setOpenedByClick(true);
+    setShowPopover((v) => !v);
+  }, [clearHideTimer]);
+
+  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+
+  if (isGrouped) {
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    const showAbove = rect && rect.bottom + 120 > window.innerHeight && rect.top > 120;
+    const popoverContent = showPopover && rect && (
+      <div
+        className="fixed z-[100] min-w-[180px] max-w-[220px] rounded-xl border border-indigo-100 bg-white py-3 shadow-xl"
+        style={{
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 228)),
+          ...(showAbove
+            ? { bottom: window.innerHeight - rect.top + 8 }
+            : { top: rect.bottom + 8 }),
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col gap-2 px-4">
+          {users!.map((u) => (
+            <div key={u.userId} className="flex items-center gap-3">
+              {u.userPhotoURL ? (
+                <img
+                  src={u.userPhotoURL}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded-full ring-1 ring-indigo-100"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ backgroundColor: getUserColor(u.userId) }}
+                >
+                  {u.userName?.[0] ?? "?"}
+                </div>
+              )}
+              <span className="text-sm font-medium text-gray-900">
+                {u.userName}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    return (
+      <>
+        <div
+          ref={wrapperRef}
+          className="flex cursor-pointer flex-col gap-0.5 overflow-hidden py-0.5"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleClick}
+        >
+          {users!.map((u) => (
+            <div key={u.userId} className="flex items-center gap-1.5 min-w-0">
+              {u.userPhotoURL ? (
+                <img
+                  src={u.userPhotoURL}
+                  alt=""
+                  className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[7px] font-bold text-white"
+                  style={{ backgroundColor: getUserColor(u.userId) }}
+                >
+                  {u.userName?.[0] ?? "?"}
+                </div>
+              )}
+              <span className="truncate text-[0.7rem] font-medium text-indigo-800">
+                {u.userName}
+              </span>
+            </div>
+          ))}
+        </div>
+        {showPopover &&
+          createPortal(
+            <>
+              {openedByClick && (
+                <div
+                  className="fixed inset-0 z-[99]"
+                  onClick={() => setShowPopover(false)}
+                  aria-hidden
+                />
+              )}
+              {popoverContent}
+            </>,
+            document.body
+          )}
+      </>
+    );
+  }
+
   const photoURL = event.resource?.userPhotoURL;
-  const color = getUserColor(event.resource.userId);
+  const color = getUserColor(event.resource!.userId);
   return (
     <div className="flex items-center gap-1.5 overflow-hidden">
       {photoURL ? (
@@ -376,14 +537,22 @@ function MobileDayView({
             {/* Cards for this time slot */}
             <div className="flex flex-1 flex-col gap-2">
               {slot.events.map((event) => {
-                const color = getUserColor(event.resource.userId);
-                const photoURL = event.resource.userPhotoURL;
+                const users = event.resource?.users;
+                const isGrouped = users && users.length > 1;
+                const displayUsers = isGrouped ? users! : [{
+                  userId: event.resource!.userId,
+                  userName: event.resource!.userName,
+                  userPhotoURL: event.resource!.userPhotoURL ?? "",
+                }];
+                const borderColor = isGrouped ? "#6366f1" : getUserColor(event.resource!.userId);
                 return (
                   <button
                     key={event.id}
                     onClick={() => onSelectEvent?.(event)}
-                    className="flex flex-col rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm active:bg-gray-50"
-                    style={{ borderLeftWidth: 4, borderLeftColor: color }}
+                    className={`flex flex-col rounded-xl border border-gray-100 p-3 text-left shadow-sm active:opacity-90 ${
+                      isGrouped ? "bg-indigo-50" : "bg-white active:bg-gray-50"
+                    }`}
+                    style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
                   >
                     <span className="text-sm font-semibold text-gray-900">
                       {event.title}
@@ -393,25 +562,29 @@ function MobileDayView({
                       <span className="ml-1.5 text-gray-300">·</span>
                       <span className="ml-1.5">{formatDuration(event.start, event.end)}</span>
                     </span>
-                    <div className="mt-2 flex items-center gap-2">
-                      {photoURL ? (
-                        <img
-                          src={photoURL}
-                          alt=""
-                          className="h-6 w-6 rounded-full"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                          style={{ backgroundColor: color }}
-                        >
-                          {event.resource.userName?.[0] ?? "?"}
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {displayUsers.map((u) => (
+                        <div key={u.userId} className="flex items-center gap-2">
+                          {u.userPhotoURL ? (
+                            <img
+                              src={u.userPhotoURL}
+                              alt=""
+                              className="h-6 w-6 rounded-full"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                              style={{ backgroundColor: getUserColor(u.userId) }}
+                            >
+                              {u.userName?.[0] ?? "?"}
+                            </div>
+                          )}
+                          <span className={`text-xs font-medium ${isGrouped ? "text-indigo-800" : "text-gray-600"}`}>
+                            {u.userName}
+                          </span>
                         </div>
-                      )}
-                      <span className="text-xs font-medium text-gray-600">
-                        {event.resource.userName}
-                      </span>
+                      ))}
                     </div>
                   </button>
                 );
@@ -453,6 +626,7 @@ export default function CalendarView({
   onSelectEvent,
 }: CalendarViewProps) {
   const isMobile = useIsMobile();
+  const mergedEvents = useMemo(() => mergeOverlappingEvents(events), [events]);
   const [view, setView] = useState<View>(() => (window.innerWidth < 768 ? "day" : "week"));
   const [date, setDate] = useState<Date>(new Date());
   const [mobileDate, setMobileDate] = useState(() => dayjs());
@@ -466,7 +640,20 @@ export default function CalendarView({
   }, []);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    const color = getUserColor(event.resource.userId);
+    const isGrouped = event.resource?.users && event.resource.users.length > 1;
+    if (isGrouped) {
+      return {
+        style: {
+          backgroundColor: "#e0e7ff",
+          borderLeft: "3px solid #6366f1",
+          borderRadius: "8px",
+          color: "#4338ca",
+          fontSize: "0.78rem",
+          padding: "4px 8px",
+        },
+      };
+    }
+    const color = getUserColor(event.resource!.userId);
     return {
       style: {
         backgroundColor: `${color}18`,
@@ -523,7 +710,7 @@ export default function CalendarView({
   if (isMobile && view === "day") {
     return (
       <MobileDayView
-        events={events}
+        events={mergedEvents}
         selectedDate={mobileDate}
         onSelectDate={setMobileDate}
         onNavigateWeek={(dir) => {
@@ -542,7 +729,7 @@ export default function CalendarView({
     <div ref={calSwipeRef} className="mb-5 h-[calc(100vh-220px)] min-h-[400px] md:h-[calc(100vh-280px)]">
       <Calendar
         localizer={localizer}
-        events={events}
+        events={mergedEvents}
         view={view}
         onView={handleViewChange}
         date={date}
@@ -560,6 +747,7 @@ export default function CalendarView({
         popup
         step={30}
         timeslots={2}
+        longPressThreshold={1}
       />
     </div>
   );
