@@ -63,6 +63,7 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -86,7 +87,9 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
             createdAt: data.createdAt?.toDate(),
           };
         });
-        setDuplicates(findDuplicates(docs));
+        const groups = findDuplicates(docs);
+        setDuplicates(groups);
+        setSelectedKeys(new Set(groups.map((g) => g.key)));
       })
       .catch((err) => {
         setError("Failed to load availabilities");
@@ -95,13 +98,27 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
       .finally(() => setLoading(false));
   }, [open]);
 
+  function toggleGroup(key: string) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAll(checked: boolean) {
+    setSelectedKeys(checked ? new Set(duplicates.map((g) => g.key)) : new Set());
+  }
+
   async function handleCleanup() {
-    if (duplicates.length === 0) return;
+    const toClean = duplicates.filter((g) => selectedKeys.has(g.key));
+    if (toClean.length === 0) return;
     setCleaning(true);
     setError("");
     try {
       const toDelete: { ref: ReturnType<typeof doc> }[] = [];
-      for (const group of duplicates) {
+      for (const group of toClean) {
         for (let i = 1; i < group.docs.length; i++) {
           toDelete.push({ ref: doc(db, "availabilities", group.docs[i].id) });
         }
@@ -115,8 +132,13 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
         }
         await batch.commit();
       }
-      setDuplicates([]);
-      onClose();
+      setDuplicates((prev) => prev.filter((g) => !selectedKeys.has(g.key)));
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        toClean.forEach((g) => next.delete(g.key));
+        return next;
+      });
+      if (duplicates.length === toClean.length) onClose();
     } catch (err) {
       setError("Failed to clean up duplicates");
       console.error(err);
@@ -127,7 +149,9 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
 
   if (!open) return null;
 
-  const totalDuplicates = duplicates.reduce((sum, g) => sum + g.docs.length - 1, 0);
+  const selectedGroups = duplicates.filter((g) => selectedKeys.has(g.key));
+  const totalDuplicates = selectedGroups.reduce((sum, g) => sum + g.docs.length - 1, 0);
+  const allSelected = duplicates.length > 0 && selectedKeys.size === duplicates.length;
 
   return (
     <>
@@ -161,24 +185,51 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
                   No duplicate events found
                 </p>
               ) : (
-                <ul className="divide-y divide-gray-100">
-                  {duplicates.map((group) => (
-                    <li key={group.key} className="px-4 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-gray-900">{group.userName}</p>
-                          <p className="text-sm text-gray-500">
-                            {dayjs(group.start).format("ddd, D MMM")} ·{" "}
-                            {dayjs(group.start).format("HH:mm")} – {dayjs(group.end).format("HH:mm")}
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                          {group.docs.length} copies
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) {
+                            const some = selectedKeys.size > 0 && selectedKeys.size < duplicates.length;
+                            el.indeterminate = some;
+                          }
+                        }}
+                        onChange={(e) => toggleAll(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      Select all
+                    </label>
+                  </div>
+                  <ul className="divide-y divide-gray-100">
+                    {duplicates.map((group) => (
+                      <li key={group.key} className="px-4 py-3">
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedKeys.has(group.key)}
+                            onChange={() => toggleGroup(group.key)}
+                            className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+                            <div>
+                              <p className="font-medium text-gray-900">{group.userName}</p>
+                              <p className="text-sm text-gray-500">
+                                {dayjs(group.start).format("ddd, D MMM")} ·{" "}
+                                {dayjs(group.start).format("HH:mm")} – {dayjs(group.end).format("HH:mm")}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                              {group.docs.length} copies
+                            </span>
+                          </div>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
 
@@ -196,10 +247,10 @@ export default function DuplicateEventsModal({ open, onClose }: DuplicateEventsM
               {duplicates.length > 0 && (
                 <button
                   onClick={handleCleanup}
-                  disabled={cleaning}
+                  disabled={cleaning || selectedKeys.size === 0}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                 >
-                  {cleaning ? "Cleaning…" : `Clean up (${totalDuplicates} duplicates)`}
+                  {cleaning ? "Cleaning…" : `Clean up (${totalDuplicates} selected)`}
                 </button>
               )}
             </div>
