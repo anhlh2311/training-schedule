@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import DisplayNameModal from "./DisplayNameModal";
+import DuplicateEventsModal from "./DuplicateEventsModal";
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-purple-100 text-purple-700" },
@@ -10,11 +11,12 @@ const ROLE_BADGE: Record<string, { label: string; className: string }> = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, appUser, isTrainer, signOut, updateDisplayName } = useAuth();
+  const { user, appUser, isTrainer, isAdmin, signOut, updateDisplayName } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
 
   const displayName = appUser?.displayName || user?.displayName || "";
 
@@ -183,6 +185,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </svg>
                       Edit profile
                     </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setDuplicateModalOpen(true); setUserMenuOpen(false); }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+                        role="menuitem"
+                      >
+                        <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                        </svg>
+                        Duplicate events
+                      </button>
+                    )}
                     <button
                       onClick={() => { signOut(); setUserMenuOpen(false); }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
@@ -244,6 +258,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </svg>
                   Edit profile
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setDuplicateModalOpen(true); setMobileOpen(false); }}
+                    className="flex items-center gap-2 rounded-lg p-2 text-left text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    <svg className="h-5 w-5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                    </svg>
+                    Duplicate events
+                  </button>
+                )}
                 {/* Line 3: Sign out */}
                 <button
                   onClick={() => { signOut(); setMobileOpen(false); }}
@@ -264,6 +289,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           currentName={displayName}
           onClose={() => setProfileModalOpen(false)}
           onSave={updateDisplayName}
+        />
+        <DuplicateEventsModal
+          open={duplicateModalOpen}
+          onClose={() => setDuplicateModalOpen(false)}
         />
       </nav>
 
