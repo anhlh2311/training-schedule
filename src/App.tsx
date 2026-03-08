@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 import SchedulePage from "./pages/SchedulePage";
 import UsersPage from "./pages/admin/UsersPage";
 import TrainersPage from "./pages/admin/TrainersPage";
+import EventsPage from "./pages/admin/EventsPage";
 
 export default function App() {
   return (
@@ -50,6 +51,16 @@ export default function App() {
               <ProtectedRoute requiredRole="trainer">
                 <Layout>
                   <TrainersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <EventsPage />
                 </Layout>
               </ProtectedRoute>
             }

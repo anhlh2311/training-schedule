@@ -67,6 +67,12 @@ function getUserColor(userId: string): string {
   return USER_COLORS[hashString(userId) % USER_COLORS.length];
 }
 
+function sortByUserName<T extends { userName?: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) =>
+    (a.userName ?? "").localeCompare(b.userName ?? "", undefined, { sensitivity: "base" })
+  );
+}
+
 function formatDuration(start: Date, end: Date): string {
   const mins = dayjs(end).diff(dayjs(start), "minute");
   if (mins < 60) return `${mins}m`;
@@ -75,22 +81,25 @@ function formatDuration(start: Date, end: Date): string {
   return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
 
-/** Merge events with identical start/end into grouped events for cleaner display */
+/** Merge availability events with identical start/end; keep admin events separate */
 function mergeOverlappingEvents(events: CalendarEvent[]): CalendarEvent[] {
+  const adminEvents = events.filter((e) => e.resource?.isEvent);
+  const availEvents = events.filter((e) => !e.resource?.isEvent);
+
   const bySlot = new Map<string, CalendarEvent[]>();
-  for (const ev of events) {
+  for (const ev of availEvents) {
     const key = `${ev.start.getTime()}-${ev.end.getTime()}`;
     const arr = bySlot.get(key);
     if (arr) arr.push(ev);
     else bySlot.set(key, [ev]);
   }
-  const result: CalendarEvent[] = [];
+  const merged: CalendarEvent[] = [];
   for (const group of bySlot.values()) {
     if (group.length === 1) {
-      result.push(group[0]);
+      merged.push(group[0]);
     } else {
       const first = group[0];
-      result.push({
+      merged.push({
         id: `group-${first.start.getTime()}-${first.end.getTime()}`,
         title: group.map((e) => e.resource.userName).join(", "),
         start: first.start,
@@ -106,7 +115,9 @@ function mergeOverlappingEvents(events: CalendarEvent[]): CalendarEvent[] {
       });
     }
   }
-  return result.sort((a, b) => a.start.getTime() - b.start.getTime());
+  return [...merged, ...adminEvents].sort(
+    (a, b) => a.start.getTime() - b.start.getTime()
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,7 +208,12 @@ function CustomToolbar({ label, onNavigate, onView, view, views, date }: Toolbar
 
 function CustomEvent({ event }: EventProps<CalendarEvent>) {
   const users = event.resource?.users;
+  const participants = event.resource?.participants;
+  const isEvent = event.resource?.isEvent;
   const isGrouped = users && users.length > 1;
+  const displayParticipants = sortByUserName(
+    participants ?? (users ? users.map((u) => ({ userId: u.userId, userName: u.userName, userPhotoURL: u.userPhotoURL })) : [])
+  );
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showPopover, setShowPopover] = useState(false);
   const [openedByClick, setOpenedByClick] = useState(false);
@@ -229,10 +245,11 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
-  if (isGrouped) {
+  if (isGrouped || (isEvent && displayParticipants.length > 0)) {
     const rect = wrapperRef.current?.getBoundingClientRect();
     const showAbove = rect && rect.bottom + 120 > window.innerHeight && rect.top > 120;
-    const popoverContent = showPopover && rect && (
+    const list = isEvent ? displayParticipants : sortByUserName(users!);
+    const popoverContent = showPopover && rect && list.length > 0 && (
       <div
         className="fixed z-[100] min-w-[180px] max-w-[220px] rounded-xl border border-indigo-100 bg-white py-3 shadow-xl"
         style={{
@@ -245,8 +262,13 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
         onMouseLeave={handleMouseLeave}
         onClick={(e) => e.stopPropagation()}
       >
+        {isEvent && (
+          <p className="mb-2 border-b border-gray-100 px-4 pb-2 text-sm font-semibold text-gray-900">
+            {event.title}
+          </p>
+        )}
         <div className="flex flex-col gap-2 px-4">
-          {users!.map((u) => (
+          {list.map((u) => (
             <div key={u.userId} className="flex items-center gap-3">
               {u.userPhotoURL ? (
                 <img
@@ -281,28 +303,67 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
           onMouseLeave={handleMouseLeave}
           onClick={handleClick}
         >
-          {users!.map((u) => (
-            <div key={u.userId} className="flex items-center gap-1.5 min-w-0">
-              {u.userPhotoURL ? (
-                <img
-                  src={u.userPhotoURL}
-                  alt=""
-                  className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[7px] font-bold text-white"
-                  style={{ backgroundColor: getUserColor(u.userId) }}
-                >
-                  {u.userName?.[0] ?? "?"}
+          {isEvent ? (
+            <>
+              <span className="truncate font-medium text-indigo-800">
+                {event.title}
+              </span>
+              {displayParticipants.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {displayParticipants.slice(0, 3).map((u) => (
+                    <div key={u.userId} className="flex items-center gap-1 min-w-0">
+                      {u.userPhotoURL ? (
+                        <img
+                          src={u.userPhotoURL}
+                          alt=""
+                          className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[7px] font-bold text-white"
+                          style={{ backgroundColor: getUserColor(u.userId) }}
+                        >
+                          {u.userName?.[0] ?? "?"}
+                        </div>
+                      )}
+                      <span className="truncate text-[0.65rem] text-indigo-600">
+                        {u.userName}
+                      </span>
+                    </div>
+                  ))}
+                  {displayParticipants.length > 3 && (
+                    <span className="text-[0.65rem] text-gray-500">
+                      +{displayParticipants.length - 3}
+                    </span>
+                  )}
                 </div>
               )}
-              <span className="truncate text-[0.7rem] font-medium text-indigo-800">
-                {u.userName}
-              </span>
-            </div>
-          ))}
+            </>
+          ) : (
+            sortByUserName(users!).map((u) => (
+              <div key={u.userId} className="flex items-center gap-1.5 min-w-0">
+                {u.userPhotoURL ? (
+                  <img
+                    src={u.userPhotoURL}
+                    alt=""
+                    className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-white"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[7px] font-bold text-white"
+                    style={{ backgroundColor: getUserColor(u.userId) }}
+                  >
+                    {u.userName?.[0] ?? "?"}
+                  </div>
+                )}
+                <span className="truncate text-[0.7rem] font-medium text-indigo-800">
+                  {u.userName}
+                </span>
+              </div>
+            ))
+          )}
         </div>
         {showPopover &&
           createPortal(
@@ -319,6 +380,14 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
             document.body
           )}
       </>
+    );
+  }
+
+  if (isEvent) {
+    return (
+      <div className="flex items-center gap-1.5 overflow-hidden">
+        <span className="truncate font-medium text-indigo-800">{event.title}</span>
+      </div>
     );
   }
 
@@ -538,13 +607,21 @@ function MobileDayView({
             <div className="flex flex-1 flex-col gap-2">
               {slot.events.map((event) => {
                 const users = event.resource?.users;
+                const participants = event.resource?.participants;
+                const isEvent = event.resource?.isEvent;
                 const isGrouped = users && users.length > 1;
-                const displayUsers = isGrouped ? users! : [{
-                  userId: event.resource!.userId,
-                  userName: event.resource!.userName,
-                  userPhotoURL: event.resource!.userPhotoURL ?? "",
-                }];
-                const borderColor = isGrouped ? "#6366f1" : getUserColor(event.resource!.userId);
+                const displayUsers = sortByUserName(
+                  isEvent && participants
+                    ? participants
+                    : isGrouped
+                      ? users!
+                      : [{
+                          userId: event.resource!.userId,
+                          userName: event.resource!.userName,
+                          userPhotoURL: event.resource!.userPhotoURL ?? "",
+                        }]
+                );
+                const borderColor = isEvent ? "#6366f1" : isGrouped ? "#6366f1" : getUserColor(event.resource!.userId);
                 return (
                   <button
                     key={event.id}
@@ -640,7 +717,20 @@ export default function CalendarView({
   }, []);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
+    const isEvent = event.resource?.isEvent;
     const isGrouped = event.resource?.users && event.resource.users.length > 1;
+    if (isEvent) {
+      return {
+        style: {
+          backgroundColor: "#e0e7ff",
+          borderLeft: "3px solid #6366f1",
+          borderRadius: "8px",
+          color: "#4338ca",
+          fontSize: "0.78rem",
+          padding: "4px 8px",
+        },
+      };
+    }
     if (isGrouped) {
       return {
         style: {

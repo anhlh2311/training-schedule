@@ -45,16 +45,51 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const RETRYABLE_PATTERNS = [
+  "unavailable",
+  "resource-exhausted",
+  "deadline-exceeded",
+  "aborted",
+  "internal",
+  "quic",
+  "network",
+  "too many",
+  "connection",
+];
+
+function isRetryable(error: unknown): boolean {
+  const msg = String((error as Error)?.message ?? error).toLowerCase();
+  const code = String((error as { code?: string })?.code ?? "").toLowerCase();
+  return RETRYABLE_PATTERNS.some((p) => msg.includes(p) || code.includes(p));
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 500
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt === maxAttempts || !isRetryable(err)) throw err;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
 async function resolveInvitedRole(email: string): Promise<UserRole | null> {
   try {
     const inviteRef = doc(db, "invites", email.toLowerCase());
-    const snap = await getDoc(inviteRef);
+    const snap = await withRetry(() => getDoc(inviteRef));
     if (!snap.exists()) return null;
     const role = snap.data().role as UserRole;
-    // Delete consumed invite; use try-catch so a delete failure
-    // doesn't block user creation
     try {
-      await deleteDoc(inviteRef);
+      await withRetry(() => deleteDoc(inviteRef));
     } catch {
       // Invite cleanup failed -- admin can remove it manually
     }
@@ -66,10 +101,12 @@ async function resolveInvitedRole(email: string): Promise<UserRole | null> {
 
 async function upsertUserDoc(firebaseUser: User): Promise<void> {
   const userRef = doc(db, "users", firebaseUser.uid);
-  const snap = await getDoc(userRef);
+  const snap = await withRetry(() => getDoc(userRef));
 
   if (snap.exists()) {
-    await updateDoc(userRef, { lastLoginAt: Timestamp.now() });
+    await withRetry(() =>
+      updateDoc(userRef, { lastLoginAt: Timestamp.now() })
+    );
   } else {
     let role: UserRole = "user";
 
@@ -80,14 +117,16 @@ async function upsertUserDoc(firebaseUser: User): Promise<void> {
       if (invitedRole) role = invitedRole;
     }
 
-    await setDoc(userRef, {
-      email: firebaseUser.email ?? "",
-      displayName: firebaseUser.displayName ?? "",
-      photoURL: firebaseUser.photoURL ?? "",
-      role,
-      createdAt: Timestamp.now(),
-      lastLoginAt: Timestamp.now(),
-    });
+    await withRetry(() =>
+      setDoc(userRef, {
+        email: firebaseUser.email ?? "",
+        displayName: firebaseUser.displayName ?? "",
+        photoURL: firebaseUser.photoURL ?? "",
+        role,
+        createdAt: Timestamp.now(),
+        lastLoginAt: Timestamp.now(),
+      })
+    );
   }
 }
 
@@ -167,14 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!trimmed) return;
 
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, { displayName: trimmed });
+    await withRetry(() => updateDoc(userRef, { displayName: trimmed }));
     await updateProfile(user, { displayName: trimmed });
 
     const availabilitiesQuery = query(
       collection(db, "availabilities"),
       where("userId", "==", user.uid)
     );
-    const snap = await getDocs(availabilitiesQuery);
+    const snap = await withRetry(() => getDocs(availabilitiesQuery));
     if (snap.empty) return;
 
     const BATCH_SIZE = 500;
@@ -185,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       for (const d of chunk) {
         batch.update(d.ref, { userName: trimmed });
       }
-      await batch.commit();
+      await withRetry(() => batch.commit());
     }
   }
 

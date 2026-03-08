@@ -65,6 +65,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <div className="mx-2 w-px self-stretch bg-gray-200" />
                   <Link to="/admin/users" className={navLinkClass("/admin/users")}>Users</Link>
                   <Link to="/admin/trainers" className={navLinkClass("/admin/trainers")}>Trainers</Link>
+                  {isAdmin && (
+                    <Link to="/admin/events" className={navLinkClass("/admin/events")}>Events</Link>
+                  )}
                 </>
               )}
             </div>
@@ -99,6 +102,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                   </svg>
                 </Link>
+                {isAdmin && (
+                  <Link to="/admin/events" className={mobileIconClass("/admin/events")} aria-label="Events">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  </Link>
+                )}
               </>
             )}
 
