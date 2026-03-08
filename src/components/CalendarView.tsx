@@ -247,13 +247,20 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
 
   if (isGrouped || (isEvent && displayParticipants.length > 0)) {
     const rect = wrapperRef.current?.getBoundingClientRect();
-    const showAbove = rect && rect.bottom + 120 > window.innerHeight && rect.top > 120;
     const list = isEvent ? displayParticipants : sortByUserName(users!);
+    const estimatedPopoverHeight = (isEvent ? 52 : 0) + list.length * 40 + 24;
+    const spaceBelow = rect ? window.innerHeight - rect.bottom - 16 : 0;
+    const spaceAbove = rect ? rect.top - 16 : 0;
+    const showAbove = rect && (spaceBelow < Math.min(estimatedPopoverHeight, 200) || spaceAbove > spaceBelow);
+    const maxHeight = rect
+      ? Math.min(320, Math.max(120, showAbove ? spaceAbove : spaceBelow))
+      : 280;
     const popoverContent = showPopover && rect && list.length > 0 && (
       <div
-        className="fixed z-[100] min-w-[180px] max-w-[220px] rounded-xl border border-indigo-100 bg-white py-3 shadow-xl"
+        className="fixed z-[100] min-w-[180px] max-w-[220px] flex flex-col rounded-xl border border-indigo-100 bg-white py-3 shadow-xl"
         style={{
           left: Math.max(8, Math.min(rect.left, window.innerWidth - 228)),
+          maxHeight,
           ...(showAbove
             ? { bottom: window.innerHeight - rect.top + 8 }
             : { top: rect.bottom + 8 }),
@@ -263,11 +270,11 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
         onClick={(e) => e.stopPropagation()}
       >
         {isEvent && (
-          <p className="mb-2 border-b border-gray-100 px-4 pb-2 text-sm font-semibold text-gray-900">
+          <p className="mb-2 shrink-0 border-b border-gray-100 px-4 pb-2 text-sm font-semibold text-gray-900">
             {event.title}
           </p>
         )}
-        <div className="flex flex-col gap-2 px-4">
+        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto px-4">
           {list.map((u) => (
             <div key={u.userId} className="flex items-center gap-3">
               {u.userPhotoURL ? (
