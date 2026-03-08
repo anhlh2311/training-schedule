@@ -312,7 +312,7 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
         >
           {isEvent ? (
             <>
-              <span className="truncate font-medium text-indigo-800">
+              <span className="truncate font-medium text-orange-800">
                 {event.title}
               </span>
               {displayParticipants.length > 0 && (
@@ -334,7 +334,7 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
                           {u.userName?.[0] ?? "?"}
                         </div>
                       )}
-                      <span className="truncate text-[0.65rem] text-indigo-600">
+                        <span className="truncate text-[0.65rem] text-orange-700">
                         {u.userName}
                       </span>
                     </div>
@@ -393,7 +393,7 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
   if (isEvent) {
     return (
       <div className="flex items-center gap-1.5 overflow-hidden">
-        <span className="truncate font-medium text-indigo-800">{event.title}</span>
+        <span className="truncate font-medium text-orange-800">{event.title}</span>
       </div>
     );
   }
@@ -628,13 +628,13 @@ function MobileDayView({
                           userPhotoURL: event.resource!.userPhotoURL ?? "",
                         }]
                 );
-                const borderColor = isEvent ? "#6366f1" : isGrouped ? "#6366f1" : getUserColor(event.resource!.userId);
+                const borderColor = isEvent ? "#ea580c" : isGrouped ? "#6366f1" : getUserColor(event.resource!.userId);
                 return (
                   <button
                     key={event.id}
                     onClick={() => onSelectEvent?.(event)}
                     className={`flex flex-col rounded-xl border border-gray-100 p-3 text-left shadow-sm active:opacity-90 ${
-                      isGrouped ? "bg-indigo-50" : "bg-white active:bg-gray-50"
+                      isEvent ? "bg-orange-50" : isGrouped ? "bg-indigo-50" : "bg-white active:bg-gray-50"
                     }`}
                     style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
                   >
@@ -664,7 +664,7 @@ function MobileDayView({
                               {u.userName?.[0] ?? "?"}
                             </div>
                           )}
-                          <span className={`text-xs font-medium ${isGrouped ? "text-indigo-800" : "text-gray-600"}`}>
+                          <span className={`text-xs font-medium ${isEvent ? "text-orange-800" : isGrouped ? "text-indigo-800" : "text-gray-600"}`}>
                             {u.userName}
                           </span>
                         </div>
@@ -729,10 +729,10 @@ export default function CalendarView({
     if (isEvent) {
       return {
         style: {
-          backgroundColor: "#e0e7ff",
-          borderLeft: "3px solid #6366f1",
+          backgroundColor: "#ffedd5",
+          borderLeft: "3px solid #ea580c",
           borderRadius: "8px",
-          color: "#4338ca",
+          color: "#c2410c",
           fontSize: "0.78rem",
           padding: "4px 8px",
         },
