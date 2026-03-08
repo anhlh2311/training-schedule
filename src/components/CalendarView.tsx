@@ -236,11 +236,11 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
     hideTimerRef.current = setTimeout(() => setShowPopover(false), 150);
   }, []);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClick = useCallback(() => {
     clearHideTimer();
     setOpenedByClick(true);
     setShowPopover((v) => !v);
+    // Do not stopPropagation - let the click bubble so Calendar's onSelectEvent fires (Drop off / Subscribe modal)
   }, [clearHideTimer]);
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
@@ -305,7 +305,7 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
       <>
         <div
           ref={wrapperRef}
-          className="flex cursor-pointer flex-col gap-0.5 overflow-hidden py-0.5"
+          className="flex h-full min-h-full w-full cursor-pointer flex-col justify-start gap-0.5 overflow-hidden py-0.5"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onClick={handleClick}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   collection,
   addDoc,
@@ -10,12 +10,14 @@ import {
   writeBatch,
   getDocs,
   Timestamp,
+  orderBy,
 } from "firebase/firestore";
 import dayjs from "dayjs";
 import type { SlotInfo } from "react-big-calendar";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import CalendarView from "../components/CalendarView";
+import DropOffModal from "../components/DropOffModal";
 import type { CalendarEvent } from "../types";
 
 type Recurrence = "none" | "weekly" | "monthly";
@@ -47,13 +49,15 @@ function rangesOverlap(
 
 export default function SchedulePage() {
   const { user, appUser } = useAuth();
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [availabilities, setAvailabilities] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<CreateModal>(INITIAL_MODAL);
   const [deleteModal, setDeleteModal] = useState<{
     open: boolean;
     event?: CalendarEvent;
   }>({ open: false });
+  const [dropOffModalOpen, setDropOffModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [createError, setCreateError] = useState("");
 
   useEffect(() => {
@@ -83,12 +87,103 @@ export default function SchedulePage() {
           },
         };
       });
-      setEvents(items);
+      setAvailabilities(items);
       setLoading(false);
     });
 
     return unsubscribe;
   }, [user]);
+
+  const [participantOccurrenceIds, setParticipantOccurrenceIds] = useState<Set<string>>(new Set());
+  const [occurrencesMap, setOccurrencesMap] = useState<
+    Map<string, { eventId: string; title: string; start: Date; end: Date }>
+  >(new Map());
+  const [participantsByOcc, setParticipantsByOcc] = useState<
+    Map<string, Array<{ userId: string; userName: string; userPhotoURL?: string }>>
+  >(new Map());
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "eventParticipants"),
+      where("userId", "==", user.uid)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const ids = new Set(snapshot.docs.map((d) => d.data().occurrenceId));
+      const byOcc = new Map<string, Array<{ userId: string; userName: string; userPhotoURL?: string }>>();
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        const arr = byOcc.get(data.occurrenceId) ?? [];
+        arr.push({
+          userId: data.userId,
+          userName: data.userName,
+          userPhotoURL: data.userPhotoURL,
+        });
+        byOcc.set(data.occurrenceId, arr);
+      }
+      setParticipantOccurrenceIds(ids);
+      setParticipantsByOcc(byOcc);
+    });
+    return unsub;
+  }, [user]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "eventOccurrences"),
+      orderBy("start", "asc")
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const map = new Map<string, { eventId: string; title: string; start: Date; end: Date }>();
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        map.set(d.id, {
+          eventId: data.eventId,
+          title: data.title,
+          start: data.start.toDate(),
+          end: data.end.toDate(),
+        });
+      }
+      setOccurrencesMap(map);
+    });
+    return unsub;
+  }, []);
+
+  const eventSubscriptions = useMemo(() => {
+    if (!user || !appUser) return [];
+
+    const items: CalendarEvent[] = [];
+    participantOccurrenceIds.forEach((occId) => {
+      const occ = occurrencesMap.get(occId);
+      if (!occ) return;
+      const participants = participantsByOcc.get(occId) ?? [];
+      items.push({
+        id: occId,
+        title: occ.title,
+        start: occ.start,
+        end: occ.end,
+        resource: {
+          userId: user.uid,
+          userEmail: user.email ?? "",
+          userName: appUser.displayName || user.displayName || "Anonymous",
+          userPhotoURL: user.photoURL ?? "",
+          eventId: occ.eventId,
+          occurrenceId: occId,
+          isEvent: true,
+          participants,
+        },
+      });
+    });
+    return items;
+  }, [user, appUser, participantOccurrenceIds, occurrencesMap, participantsByOcc]);
+
+  const events = useMemo(
+    () =>
+      [...availabilities, ...eventSubscriptions].sort(
+        (a, b) => a.start.getTime() - b.start.getTime()
+      ),
+    [availabilities, eventSubscriptions]
+  );
 
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
     setCreateError("");
@@ -101,7 +196,12 @@ export default function SchedulePage() {
   }, []);
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
-    setDeleteModal({ open: true, event });
+    if (event.resource?.isEvent) {
+      setSelectedEvent(event);
+      setDropOffModalOpen(true);
+    } else {
+      setDeleteModal({ open: true, event });
+    }
   }, []);
 
   async function handleCreateAvailability() {
@@ -225,10 +325,10 @@ export default function SchedulePage() {
         <p className="text-sm text-gray-500">
           <span className="hidden sm:inline">
             Click or drag on the calendar to register your availability, or use the + button. Click an
-            existing slot to remove it.
+            availability to remove it, or an event subscription to drop off.
           </span>
           <span className="sm:hidden">
-            Tap an existing slot to remove it, or use the + button to add availability.
+            Tap an availability to remove it, an event to drop off, or use the + button to add availability.
           </span>
         </p>
       </div>
@@ -448,6 +548,19 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+
+      <DropOffModal
+        open={dropOffModalOpen}
+        event={selectedEvent}
+        onClose={() => {
+          setDropOffModalOpen(false);
+          setSelectedEvent(null);
+        }}
+        onSuccess={() => {
+          setDropOffModalOpen(false);
+          setSelectedEvent(null);
+        }}
+      />
     </div>
   );
 }

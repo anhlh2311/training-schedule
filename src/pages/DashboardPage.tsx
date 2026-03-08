@@ -13,7 +13,6 @@ import {
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import CalendarView from "../components/CalendarView";
-import DropOffModal from "../components/DropOffModal";
 import type { CalendarEvent } from "../types";
 
 function mergeAvailabilitiesAndEvents(
@@ -71,7 +70,6 @@ export default function DashboardPage() {
   >(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [dropOffModalOpen, setDropOffModalOpen] = useState(false);
   const [eventActionModalOpen, setEventActionModalOpen] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
 
@@ -179,8 +177,10 @@ export default function DashboardPage() {
       if (!event.resource?.isEvent) return;
       setSelectedEvent(event);
       if (isParticipant(event)) {
-        setDropOffModalOpen(true);
-      } else if (isTrainer) {
+        // Drop off is handled on My Schedule page for consistent registration management
+        return;
+      }
+      if (isTrainer) {
         setEventActionModalOpen(true);
       }
     },
@@ -233,10 +233,6 @@ export default function DashboardPage() {
     }
   }, [user, appUser, selectedEvent, participantsByOccurrence]);
 
-  const handleDropOffSuccess = useCallback(() => {
-    setSelectedEvent(null);
-  }, []);
-
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -256,16 +252,6 @@ export default function DashboardPage() {
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <CalendarView events={events} onSelectEvent={handleSelectEvent} />
       </div>
-
-      <DropOffModal
-        open={dropOffModalOpen}
-        event={selectedEvent}
-        onClose={() => {
-          setDropOffModalOpen(false);
-          setSelectedEvent(null);
-        }}
-        onSuccess={handleDropOffSuccess}
-      />
 
       {eventActionModalOpen && selectedEvent && (
         <div
