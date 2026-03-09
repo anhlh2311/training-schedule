@@ -11,6 +11,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { notifyTrainers } from "../lib/notifyTrainers";
 import { useAuth } from "../context/AuthContext";
 import CalendarView from "../components/CalendarView";
 import type { CalendarEvent, EventRecurrence, EventVisibility } from "../types";
@@ -272,6 +273,13 @@ export default function DashboardPage() {
         }
         await batch.commit();
 
+        notifyTrainers({
+          type: "event_subscribe",
+          userId: user.uid,
+          userName,
+          eventId,
+          eventStartTime: selectedEvent.start.toISOString(),
+        });
         setEventActionModalOpen(false);
         setSelectedEvent(null);
       } catch (err) {

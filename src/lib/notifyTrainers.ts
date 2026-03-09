@@ -1,0 +1,44 @@
+import { auth } from "./firebase";
+
+export type NotifyEventType =
+  | "availability_added"
+  | "availability_removed"
+  | "event_subscribe"
+  | "event_drop_off";
+
+export interface NotifyPayload {
+  type: NotifyEventType;
+  userId: string;
+  userName?: string;
+  availabilityId?: string;
+  eventId?: string;
+  occurrenceId?: string;
+  eventStartTime?: string;
+}
+
+/**
+ * Notify other trainers via the backend (push or queue).
+ * Call after a successful Firestore write. Failures are logged but not thrown.
+ */
+export async function notifyTrainers(payload: NotifyPayload): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    const token = await user.getIdToken();
+    const res = await fetch("/api/notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok && import.meta.env.DEV) {
+      console.warn("notifyTrainers failed:", res.status, await res.text());
+    }
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn("notifyTrainers error:", err);
+    }
+  }
+}

@@ -8,6 +8,7 @@ import SchedulePage from "./pages/SchedulePage";
 import UsersPage from "./pages/admin/UsersPage";
 import TrainersPage from "./pages/admin/TrainersPage";
 import EventsPage from "./pages/admin/EventsPage";
+import NotificationSettingsPage from "./pages/admin/NotificationSettingsPage";
 
 export default function App() {
   return (
@@ -61,6 +62,16 @@ export default function App() {
               <ProtectedRoute requiredRole="admin">
                 <Layout>
                   <EventsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <NotificationSettingsPage />
                 </Layout>
               </ProtectedRoute>
             }

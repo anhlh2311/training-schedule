@@ -12,6 +12,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { notifyTrainers } from "../lib/notifyTrainers";
 import { useAuth } from "../context/AuthContext";
 import type { CalendarEvent } from "../types";
 
@@ -65,6 +66,14 @@ export default function DropOffModal({
         for (const d of snap.docs) {
           await deleteDoc(d.ref);
         }
+        notifyTrainers({
+          type: "event_drop_off",
+          userId,
+          userName,
+          eventId: event.resource.eventId,
+          occurrenceId,
+          eventStartTime: event.start.toISOString(),
+        });
       } else {
         const eventId = event.resource.eventId;
         if (!eventId) {
@@ -105,6 +114,13 @@ export default function DropOffModal({
             await deleteDoc(d.ref);
           }
         }
+        notifyTrainers({
+          type: "event_drop_off",
+          userId,
+          userName,
+          eventId: event.resource.eventId,
+          eventStartTime: event.start.toISOString(),
+        });
       }
 
       setReason("");

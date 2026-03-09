@@ -48,6 +48,20 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase app ID |
+| `VITE_FIREBASE_VAPID_PUBLIC_KEY` | (Optional) Web Push VAPID public key for trainer push notifications. From Firebase Console > Project settings > Cloud Messaging > Web Push certificates |
+
+**For Vercel API (trainer notifications):** set these in Vercel project settings so `/api/notify` and the cron can use Firebase Admin and FCM:
+
+| Variable | Description |
+|---|---|
+| `FIREBASE_PROJECT_ID` | Same as `VITE_FIREBASE_PROJECT_ID` |
+| `FIREBASE_CLIENT_EMAIL` | Service account client email (JSON key) |
+| `FIREBASE_PRIVATE_KEY` | Service account private key (JSON key; keep newlines or use `\n`) |
+| `CRON_SECRET` | (Optional) Secret for securing `/api/cron/process-batch` if not using Vercel Cron |
+
+## Trainer notifications
+
+Trainers receive browser push notifications when availability changes or when someone subscribes/drops off an event. Admins can enable **notification aggregation** under **Settings** so updates are batched (e.g. every 30–60 min for availability, 5–10 min for event-soon changes). The backend is Vercel serverless (`/api/notify` + cron `/api/cron/process-batch`); no Firebase Cloud Functions required.
 
 ## Deploying to Vercel
 

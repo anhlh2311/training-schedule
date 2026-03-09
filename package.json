@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/generate-firebase-sw.cjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "dayjs": "^1.11.19",
     "firebase": "^12.10.0",
+    "firebase-admin": "^12.0.0",
     "react": "^19.2.0",
     "react-big-calendar": "^1.19.4",
     "react-dom": "^19.2.0",

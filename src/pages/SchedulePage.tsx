@@ -15,6 +15,7 @@ import {
 import dayjs from "dayjs";
 import type { SlotInfo } from "react-big-calendar";
 import { db } from "../lib/firebase";
+import { notifyTrainers } from "../lib/notifyTrainers";
 import { useAuth } from "../context/AuthContext";
 import CalendarView from "../components/CalendarView";
 import DropOffModal from "../components/DropOffModal";
@@ -288,13 +289,22 @@ export default function SchedulePage() {
 
       await batch.commit();
     }
-
+    notifyTrainers({
+      type: "availability_added",
+      userId: user.uid,
+      userName: base.userName,
+    });
     setModal(INITIAL_MODAL);
   }
 
   async function handleDeleteSingle() {
     if (!deleteModal.event) return;
     await deleteDoc(doc(db, "availabilities", deleteModal.event.id));
+    notifyTrainers({
+      type: "availability_removed",
+      userId: user!.uid,
+      userName: appUser?.displayName || user?.displayName || "A trainer",
+    });
     setDeleteModal({ open: false });
   }
 
@@ -311,7 +321,11 @@ export default function SchedulePage() {
     const batch = writeBatch(db);
     snap.docs.forEach((d) => batch.delete(d.ref));
     await batch.commit();
-
+    notifyTrainers({
+      type: "availability_removed",
+      userId: user!.uid,
+      userName: appUser?.displayName || user?.displayName || "A trainer",
+    });
     setDeleteModal({ open: false });
   }
 
