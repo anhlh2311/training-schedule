@@ -16,7 +16,7 @@ import {
 import dayjs from "dayjs";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
-import type { EventTemplate, EventRecurrence } from "../../types";
+import type { EventTemplate, EventRecurrence, EventVisibility } from "../../types";
 
 interface InferredRecurrence {
   recurrence: EventRecurrence;
@@ -203,8 +203,10 @@ export default function EventsPage() {
     startDate: dayjs().format("YYYY-MM-DD"),
     startTime: "09:00",
     endTime: "10:00",
-    recurrence: "weekly" as EventRecurrence,
-    count: 4,
+    recurrence: "none" as EventRecurrence,
+    count: 1,
+    visibility: "limited" as EventVisibility,
+    venue: "",
   });
   const [selectedSlot, setSelectedSlot] = useState<BookedSlot | null>(null);
   const [createError, setCreateError] = useState("");
@@ -224,9 +226,11 @@ export default function EventsPage() {
             title: data.title,
             startTime: data.startTime,
             endTime: data.endTime,
-            recurrence: data.recurrence,
-            count: data.count,
+            recurrence: (data.recurrence as EventRecurrence) ?? "weekly",
+            count: data.count ?? 1,
             startDate: data.startDate.toDate(),
+            visibility: (data.visibility as EventVisibility) ?? "limited",
+            venue: data.venue ?? "",
             createdBy: data.createdBy,
             createdAt: data.createdAt.toDate(),
           };
@@ -316,8 +320,9 @@ export default function EventsPage() {
     setSubmitting(true);
     try {
       const startDate = dayjs(form.startDate).startOf("day");
-      const unit = form.recurrence === "weekly" ? "week" : "month";
-      const count = Math.max(1, Math.min(52, form.count));
+      const isOneTime = form.recurrence === "none";
+      const count = isOneTime ? 1 : Math.max(1, Math.min(52, form.count));
+      const unit = form.recurrence === "weekly" ? "week" : form.recurrence === "monthly" ? "month" : "day";
 
       const eventRef = await addDoc(collection(db, "events"), {
         title: form.title.trim(),
@@ -326,6 +331,8 @@ export default function EventsPage() {
         recurrence: form.recurrence,
         count,
         startDate: Timestamp.fromDate(startDate.toDate()),
+        visibility: form.visibility,
+        venue: form.venue.trim() || null,
         createdBy: user.uid,
         createdAt: Timestamp.now(),
       });
@@ -354,8 +361,10 @@ export default function EventsPage() {
         startDate: dayjs().format("YYYY-MM-DD"),
         startTime: "09:00",
         endTime: "10:00",
-        recurrence: "weekly",
-        count: 4,
+        recurrence: "none",
+        count: 1,
+        visibility: "limited",
+        venue: "",
       });
     } catch (err) {
       setCreateError("Failed to create event");
@@ -370,11 +379,11 @@ export default function EventsPage() {
     setCreateError("");
     setSubmitting(true);
     const { recurrence, count } = selectedSlot.inferredRecurrence ?? {
-      recurrence: form.recurrence,
-      count: form.count,
+      recurrence: form.recurrence === "none" ? "weekly" : form.recurrence,
+      count: form.recurrence === "none" ? 1 : form.count,
     };
     const finalCount = selectedSlot.occurrences?.length ?? Math.max(1, Math.min(52, count));
-    const unit = recurrence === "weekly" ? "week" : "month";
+    const unit = recurrence === "weekly" ? "week" : recurrence === "monthly" ? "month" : "day";
     const [sh, sm] = dayjs(selectedSlot.start).format("HH:mm").split(":").map(Number);
     const [eh, em] = dayjs(selectedSlot.end).format("HH:mm").split(":").map(Number);
 
@@ -390,9 +399,11 @@ export default function EventsPage() {
         title: form.title.trim(),
         startTime: dayjs(selectedSlot.start).format("HH:mm"),
         endTime: dayjs(selectedSlot.end).format("HH:mm"),
-        recurrence,
+        recurrence: finalCount === 1 ? "none" : recurrence,
         count: finalCount,
         startDate: Timestamp.fromDate(selectedSlot.start),
+        visibility: form.visibility,
+        venue: form.venue.trim() || null,
         createdBy: user.uid,
         createdAt: Timestamp.now(),
       });
@@ -464,8 +475,10 @@ export default function EventsPage() {
         startDate: dayjs().format("YYYY-MM-DD"),
         startTime: "09:00",
         endTime: "10:00",
-        recurrence: "weekly",
-        count: 4,
+        recurrence: "none",
+        count: 1,
+        visibility: "limited",
+        venue: "",
       });
     } catch (err) {
       setCreateError("Failed to create event from slot");
@@ -479,8 +492,9 @@ export default function EventsPage() {
     if (!user || !editingEvent || !form.title.trim()) return;
     setCreateError("");
     setSubmitting(true);
-    const count = Math.max(1, Math.min(52, form.count));
-    const unit = form.recurrence === "weekly" ? "week" : "month";
+    const isOneTime = form.recurrence === "none";
+    const count = isOneTime ? 1 : Math.max(1, Math.min(52, form.count));
+    const unit = form.recurrence === "weekly" ? "week" : form.recurrence === "monthly" ? "month" : "day";
     const startDate = dayjs(form.startDate).startOf("day");
     const [sh, sm] = form.startTime.split(":").map(Number);
     const [eh, em] = form.endTime.split(":").map(Number);
@@ -493,6 +507,8 @@ export default function EventsPage() {
         recurrence: form.recurrence,
         count,
         startDate: Timestamp.fromDate(startDate.toDate()),
+        visibility: form.visibility,
+        venue: form.venue.trim() || null,
       });
 
       const occSnap = await getDocs(
@@ -552,8 +568,10 @@ export default function EventsPage() {
         startDate: dayjs().format("YYYY-MM-DD"),
         startTime: "09:00",
         endTime: "10:00",
-        recurrence: "weekly",
-        count: 4,
+        recurrence: "none",
+        count: 1,
+        visibility: "limited",
+        venue: "",
       });
     } catch (err) {
       setCreateError("Failed to update event");
@@ -596,7 +614,7 @@ export default function EventsPage() {
             }}
             className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
           >
-            Create recurring event
+            Create event
           </button>
           <button
             onClick={() => {
@@ -624,8 +642,18 @@ export default function EventsPage() {
                   <div>
                     <p className="font-medium text-gray-900">{t.title}</p>
                     <p className="text-sm text-gray-500">
-                      {t.startTime} – {t.endTime} · {t.recurrence} · {t.count}{" "}
-                      occurrence{t.count !== 1 ? "s" : ""}
+                      {t.startTime} – {t.endTime}
+                      {(t.recurrence ?? "weekly") === "none"
+                        ? " · One-time"
+                        : ` · ${t.recurrence} · ${t.count} occurrence${t.count !== 1 ? "s" : ""}`}
+                      {(t.visibility ?? "limited") === "public" && (
+                        <span className="ml-1.5 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          Public
+                        </span>
+                      )}
+                      {t.venue && (
+                        <span className="ml-1.5 text-gray-400">· {t.venue}</span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -641,8 +669,10 @@ export default function EventsPage() {
                           startDate: dayjs(t.startDate).format("YYYY-MM-DD"),
                           startTime: t.startTime,
                           endTime: t.endTime,
-                          recurrence: t.recurrence,
-                          count: t.count,
+                          recurrence: t.recurrence ?? "weekly",
+                          count: t.count ?? 1,
+                          visibility: t.visibility ?? "limited",
+                          venue: t.venue ?? "",
                         });
                         setEditModal(true);
                       }}
@@ -674,7 +704,7 @@ export default function EventsPage() {
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
             <h2 className="text-lg font-semibold text-gray-900">
-              Create recurring event
+              Create event
             </h2>
 
             <div className="mt-4">
@@ -727,18 +757,24 @@ export default function EventsPage() {
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
                 Recurrence
               </label>
-              <div className="flex gap-2">
-                {(["weekly", "monthly"] as EventRecurrence[]).map((opt) => (
+              <div className="flex flex-wrap gap-2">
+                {(["none", "weekly", "monthly"] as EventRecurrence[]).map((opt) => (
                   <button
                     key={opt}
-                    onClick={() => setForm((f) => ({ ...f, recurrence: opt }))}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        recurrence: opt,
+                        count: opt === "none" ? 1 : f.count,
+                      }))
+                    }
                     className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
                       form.recurrence === opt
                         ? "bg-blue-600 text-white shadow-sm"
                         : "bg-gray-50 text-gray-500 hover:bg-gray-100"
                     }`}
                   >
-                    {opt === "weekly" ? "Weekly" : "Monthly"}
+                    {opt === "none" ? "One-time" : opt === "weekly" ? "Weekly" : "Monthly"}
                   </button>
                 ))}
               </div>
@@ -746,19 +782,58 @@ export default function EventsPage() {
 
             <div className="mt-4">
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
-                Number of occurrences
+                Visibility
+              </label>
+              <div className="flex gap-2">
+                {(["public", "limited"] as EventVisibility[]).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setForm((f) => ({ ...f, visibility: opt }))}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                      form.visibility === opt
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    {opt === "public" ? "Public" : "Limited"}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Public: members can subscribe. Limited: trainers only.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                Venue (optional)
               </label>
               <input
-                type="number"
-                min={1}
-                max={52}
-                value={form.count}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, count: Number(e.target.value) }))
-                }
-                className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                type="text"
+                value={form.venue}
+                onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
+                placeholder="e.g. Room 101, Main Hall"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
+
+            {form.recurrence !== "none" && (
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                  Number of occurrences
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={form.count}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, count: Number(e.target.value) }))
+                  }
+                  className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            )}
 
             {createError && (
               <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">
@@ -781,7 +856,11 @@ export default function EventsPage() {
                 disabled={!form.title.trim() || submitting}
                 className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
               >
-                {submitting ? "Creating…" : `Create ${form.count} occurrences`}
+                {submitting
+                  ? "Creating…"
+                  : form.recurrence === "none"
+                    ? "Create event"
+                    : `Create ${form.count} occurrences`}
               </button>
             </div>
           </div>
@@ -858,18 +937,24 @@ export default function EventsPage() {
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
                 Recurrence
               </label>
-              <div className="flex gap-2">
-                {(["weekly", "monthly"] as EventRecurrence[]).map((opt) => (
+              <div className="flex flex-wrap gap-2">
+                {(["none", "weekly", "monthly"] as EventRecurrence[]).map((opt) => (
                   <button
                     key={opt}
-                    onClick={() => setForm((f) => ({ ...f, recurrence: opt }))}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        recurrence: opt,
+                        count: opt === "none" ? 1 : f.count,
+                      }))
+                    }
                     className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
                       form.recurrence === opt
                         ? "bg-blue-600 text-white shadow-sm"
                         : "bg-gray-50 text-gray-500 hover:bg-gray-100"
                     }`}
                   >
-                    {opt === "weekly" ? "Weekly" : "Monthly"}
+                    {opt === "none" ? "One-time" : opt === "weekly" ? "Weekly" : "Monthly"}
                   </button>
                 ))}
               </div>
@@ -877,19 +962,55 @@ export default function EventsPage() {
 
             <div className="mt-4">
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
-                Number of occurrences
+                Visibility
+              </label>
+              <div className="flex gap-2">
+                {(["public", "limited"] as EventVisibility[]).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setForm((f) => ({ ...f, visibility: opt }))}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                      form.visibility === opt
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    {opt === "public" ? "Public" : "Limited"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                Venue (optional)
               </label>
               <input
-                type="number"
-                min={1}
-                max={52}
-                value={form.count}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, count: Number(e.target.value) }))
-                }
-                className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                type="text"
+                value={form.venue}
+                onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
+                placeholder="e.g. Room 101, Main Hall"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
+
+            {form.recurrence !== "none" && (
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                  Number of occurrences
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={form.count}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, count: Number(e.target.value) }))
+                  }
+                  className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            )}
 
             {createError && (
               <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">
@@ -913,7 +1034,7 @@ export default function EventsPage() {
                 disabled={!form.title.trim() || submitting}
                 className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
               >
-                {submitting ? "Updating…" : "Update event"}
+                {submitting ? "Updating…" : form.recurrence === "none" ? "Update event" : "Update event"}
               </button>
             </div>
           </div>
@@ -1017,6 +1138,38 @@ export default function EventsPage() {
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                    Visibility
+                  </label>
+                  <div className="flex gap-2">
+                    {(["public", "limited"] as EventVisibility[]).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setForm((f) => ({ ...f, visibility: opt }))}
+                        className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                          form.visibility === opt
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {opt === "public" ? "Public" : "Limited"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                    Venue (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={form.venue}
+                    onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
+                    placeholder="e.g. Room 101, Main Hall"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
                 {selectedSlot.inferredRecurrence ? (
                   <div className="mt-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
                     <p className="font-medium">Using recurrence from trainers</p>
@@ -1040,40 +1193,48 @@ export default function EventsPage() {
                       <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
                         Recurrence
                       </label>
-                      <div className="flex gap-2">
-                        {(["weekly", "monthly"] as EventRecurrence[]).map((opt) => (
+                      <div className="flex flex-wrap gap-2">
+                        {(["none", "weekly", "monthly"] as EventRecurrence[]).map((opt) => (
                           <button
                             key={opt}
-                            onClick={() => setForm((f) => ({ ...f, recurrence: opt }))}
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                recurrence: opt,
+                                count: opt === "none" ? 1 : f.count,
+                              }))
+                            }
                             className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
                               form.recurrence === opt
                                 ? "bg-blue-600 text-white shadow-sm"
                                 : "bg-gray-50 text-gray-500 hover:bg-gray-100"
                             }`}
                           >
-                            {opt === "weekly" ? "Weekly" : "Monthly"}
+                            {opt === "none" ? "One-time" : opt === "weekly" ? "Weekly" : "Monthly"}
                           </button>
                         ))}
                       </div>
                     </div>
-                    <div className="mt-4">
-                      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
-                        Number of occurrences
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={52}
-                        value={form.count}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, count: Number(e.target.value) }))
-                        }
-                        className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Trainers from this slot will be participants for the first occurrence only
-                      </p>
-                    </div>
+                    {form.recurrence !== "none" && (
+                      <div className="mt-4">
+                        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-400">
+                          Number of occurrences
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={52}
+                          value={form.count}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, count: Number(e.target.value) }))
+                          }
+                          className="w-24 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Trainers from this slot will be participants for the first occurrence only
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
                 {createError && (
@@ -1099,7 +1260,9 @@ export default function EventsPage() {
                   >
                     {submitting
                       ? "Creating…"
-                      : `Create ${(selectedSlot.inferredRecurrence?.count ?? form.count)} occurrence${(selectedSlot.inferredRecurrence?.count ?? form.count) !== 1 ? "s" : ""}`}
+                      : form.recurrence === "none" || (selectedSlot.inferredRecurrence?.count ?? form.count) === 1
+                        ? "Create event"
+                        : `Create ${selectedSlot.inferredRecurrence?.count ?? form.count} occurrences`}
                   </button>
                 </div>
               </>

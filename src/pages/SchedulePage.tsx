@@ -48,7 +48,7 @@ function rangesOverlap(
 }
 
 export default function SchedulePage() {
-  const { user, appUser } = useAuth();
+  const { user, appUser, isTrainer } = useAuth();
   const [availabilities, setAvailabilities] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<CreateModal>(INITIAL_MODAL);
@@ -97,6 +97,10 @@ export default function SchedulePage() {
   const [participantOccurrenceIds, setParticipantOccurrenceIds] = useState<Set<string>>(new Set());
   const [occurrencesMap, setOccurrencesMap] = useState<
     Map<string, { eventId: string; title: string; start: Date; end: Date }>
+  >(new Map());
+  const [venueByEventId, setVenueByEventId] = useState<Map<string, string>>(new Map());
+  const [recurrenceByEventId, setRecurrenceByEventId] = useState<
+    Map<string, import("../types").EventRecurrence>
   >(new Map());
   const [participantsByOcc, setParticipantsByOcc] = useState<
     Map<string, Array<{ userId: string; userName: string; userPhotoURL?: string }>>
@@ -149,6 +153,23 @@ export default function SchedulePage() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    const q = query(collection(db, "events"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const venueMap = new Map<string, string>();
+      const recMap = new Map<string, import("../types").EventRecurrence>();
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        const v = data.venue;
+        if (v && typeof v === "string") venueMap.set(d.id, v);
+        recMap.set(d.id, (data.recurrence as import("../types").EventRecurrence) ?? "weekly");
+      }
+      setVenueByEventId(venueMap);
+      setRecurrenceByEventId(recMap);
+    });
+    return unsub;
+  }, []);
+
   const eventSubscriptions = useMemo(() => {
     if (!user || !appUser) return [];
 
@@ -170,12 +191,14 @@ export default function SchedulePage() {
           eventId: occ.eventId,
           occurrenceId: occId,
           isEvent: true,
+          venue: venueByEventId.get(occ.eventId),
+          recurrence: recurrenceByEventId.get(occ.eventId),
           participants,
         },
       });
     });
     return items;
-  }, [user, appUser, participantOccurrenceIds, occurrencesMap, participantsByOcc]);
+  }, [user, appUser, participantOccurrenceIds, occurrencesMap, participantsByOcc, venueByEventId, recurrenceByEventId]);
 
   const events = useMemo(
     () =>
@@ -323,26 +346,40 @@ export default function SchedulePage() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900">My Schedule</h1>
         <p className="text-sm text-gray-500">
-          <span className="hidden sm:inline">
-            Click or drag on the calendar to register your availability, or use the + button. Click an
-            availability to remove it, or an event subscription to drop off.
-          </span>
-          <span className="sm:hidden">
-            Tap an availability to remove it, an event to drop off, or use the + button to add availability.
-          </span>
+          {isTrainer ? (
+            <>
+              <span className="hidden sm:inline">
+                Click or drag on the calendar to register your availability, or use the + button. Click an
+                availability to remove it, or an event subscription to drop off.
+              </span>
+              <span className="sm:hidden">
+                Tap an availability to remove it, an event to drop off, or use the + button to add availability.
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="hidden sm:inline">
+                View your event subscriptions. Click an event to drop off.
+              </span>
+              <span className="sm:hidden">
+                Tap an event to drop off.
+              </span>
+            </>
+          )}
         </p>
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <CalendarView
           events={events}
-          selectable
-          onSelectSlot={handleSelectSlot}
+          selectable={isTrainer}
+          onSelectSlot={isTrainer ? handleSelectSlot : undefined}
           onSelectEvent={handleSelectEvent}
         />
       </div>
 
-      {/* Mobile FAB */}
+      {/* Mobile FAB - trainers only */}
+      {isTrainer && (
       <button
         onClick={openManualModal}
         className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
@@ -352,6 +389,7 @@ export default function SchedulePage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
       </button>
+      )}
 
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => { setModal(INITIAL_MODAL); setCreateError(""); }}>
@@ -515,34 +553,50 @@ export default function SchedulePage() {
               Remove Availability
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Are you sure you want to remove{" "}
-              <span className="font-medium text-gray-700">{deleteModal.event.title}</span>?
+              Are you sure you want to remove availability registration?
             </p>
-            <p className="mt-1 text-sm text-gray-400">
-              {deleteModal.event.start.toLocaleString()} &mdash;{" "}
-              {deleteModal.event.end.toLocaleString()}
+            <p className="mt-1 text-sm font-bold text-red-700">
+              {deleteModal.event.start.toLocaleDateString()} ·{" "}
+              {deleteModal.event.start.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}{" "}
+              –{" "}
+              {deleteModal.event.end.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </p>
 
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-              <button
-                onClick={() => setDeleteModal({ open: false })}
-                className="flex-1 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 active:scale-[0.98]"
-              >
-                Cancel
-              </button>
-              {hasRecurrenceGroup && (
+            <div className="mt-6 flex flex-col gap-3">
+              {hasRecurrenceGroup ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteSingle}
+                    className="flex-1 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-200 active:scale-[0.98]"
+                  >
+                    Remove This Only
+                  </button>
+                  <button
+                    onClick={handleDeleteSeries}
+                    className="flex-1 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-100 active:scale-[0.98]"
+                  >
+                    Remove Series
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={handleDeleteSeries}
-                  className="flex-1 rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-600 transition hover:bg-amber-100 active:scale-[0.98]"
+                  onClick={handleDeleteSingle}
+                  className="w-full rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-100 active:scale-[0.98]"
                 >
-                  Remove Series
+                  Remove
                 </button>
               )}
               <button
-                onClick={handleDeleteSingle}
-                className="flex-1 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-100 active:scale-[0.98]"
+                onClick={() => setDeleteModal({ open: false })}
+                className="w-full rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 active:scale-[0.98]"
               >
-                {hasRecurrenceGroup ? "Remove This Only" : "Remove"}
+                Cancel
               </button>
             </div>
           </div>

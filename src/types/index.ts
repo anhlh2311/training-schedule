@@ -1,4 +1,6 @@
-export type UserRole = "user" | "trainer" | "admin";
+export type UserRole = "user" | "member" | "trainer" | "admin";
+
+export type EventVisibility = "public" | "limited";
 
 export interface AppUser {
   uid: string;
@@ -38,11 +40,16 @@ export interface CalendarEvent {
     eventId?: string;
     occurrenceId?: string;
     isEvent?: boolean;
+    /** public = members can subscribe; limited = trainers only */
+    visibility?: EventVisibility;
+    venue?: string;
+    /** For recurring events: "weekly" | "monthly"; for one-time: "none" */
+    recurrence?: EventRecurrence;
     participants?: Array<{ userId: string; userName: string; userPhotoURL?: string }>;
   };
 }
 
-export type EventRecurrence = "weekly" | "monthly";
+export type EventRecurrence = "none" | "weekly" | "monthly";
 
 export interface EventTemplate {
   id: string;
@@ -52,6 +59,8 @@ export interface EventTemplate {
   recurrence: EventRecurrence;
   count: number;
   startDate: Date;
+  visibility: EventVisibility;
+  venue?: string;
   createdBy: string;
   createdAt: Date;
 }

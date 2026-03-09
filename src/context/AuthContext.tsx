@@ -37,6 +37,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isTrainer: boolean;
+  isMember: boolean;
   isEmbeddedBrowser: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -183,6 +184,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = appUser?.role === "admin";
   const isTrainer = appUser?.role === "trainer" || appUser?.role === "admin";
+  const isMember =
+    appUser?.role === "member" ||
+    appUser?.role === "trainer" ||
+    appUser?.role === "admin";
   const isEmbeddedBrowserFlag = isEmbeddedBrowser();
 
   async function signInWithGoogle() {
@@ -236,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isAdmin,
         isTrainer,
+        isMember,
         isEmbeddedBrowser: isEmbeddedBrowserFlag,
         signInWithGoogle,
         signOut,

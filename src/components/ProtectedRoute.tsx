@@ -3,14 +3,15 @@ import { useAuth } from "../context/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: "trainer" | "admin";
+  /** member = member/trainer/admin; trainer = trainer/admin; admin = admin only */
+  requiredRole?: "member" | "trainer" | "admin";
 }
 
 export default function ProtectedRoute({
   children,
   requiredRole,
 }: ProtectedRouteProps) {
-  const { user, appUser, loading, isAdmin, isTrainer } = useAuth();
+  const { user, appUser, loading, isAdmin, isTrainer, isMember } = useAuth();
 
   if (loading) {
     return (
@@ -26,7 +27,13 @@ export default function ProtectedRoute({
 
   if (requiredRole && appUser) {
     const hasAccess =
-      requiredRole === "admin" ? isAdmin : isTrainer;
+      requiredRole === "admin"
+        ? isAdmin
+        : requiredRole === "trainer"
+          ? isTrainer
+          : requiredRole === "member"
+            ? isMember
+            : false;
 
     if (!hasAccess) {
       return (

@@ -13,7 +13,7 @@ import {
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import CalendarView from "../components/CalendarView";
-import type { CalendarEvent } from "../types";
+import type { CalendarEvent, EventRecurrence, EventVisibility } from "../types";
 
 function mergeAvailabilitiesAndEvents(
   availabilities: CalendarEvent[],
@@ -27,12 +27,14 @@ function mergeAvailabilitiesAndEvents(
   participantsByOccurrence: Map<
     string,
     Array<{ userId: string; userName: string; userPhotoURL?: string }>
-  >
+  >,
+  visibilityByEventId: Map<string, EventVisibility>
 ): CalendarEvent[] {
   const result: CalendarEvent[] = [...availabilities];
 
   for (const occ of eventOccurrences) {
     const participants = participantsByOccurrence.get(occ.id) ?? [];
+    const visibility = visibilityByEventId.get(occ.eventId) ?? "limited";
     result.push({
       id: occ.id,
       title: occ.title,
@@ -45,6 +47,7 @@ function mergeAvailabilitiesAndEvents(
         eventId: occ.eventId,
         occurrenceId: occ.id,
         isEvent: true,
+        visibility,
         participants,
       },
     });
@@ -54,7 +57,7 @@ function mergeAvailabilitiesAndEvents(
 }
 
 export default function DashboardPage() {
-  const { user, appUser, isTrainer } = useAuth();
+  const { user, appUser, isTrainer, isMember } = useAuth();
   const [availabilities, setAvailabilities] = useState<CalendarEvent[]>([]);
   const [eventOccurrences, setEventOccurrences] = useState<
     Array<{
@@ -68,6 +71,13 @@ export default function DashboardPage() {
   const [participantsByOccurrence, setParticipantsByOccurrence] = useState<
     Map<string, Array<{ userId: string; userName: string; userPhotoURL?: string }>>
   >(new Map());
+  const [visibilityByEventId, setVisibilityByEventId] = useState<
+    Map<string, EventVisibility>
+  >(new Map());
+  const [recurrenceByEventId, setRecurrenceByEventId] = useState<
+    Map<string, EventRecurrence>
+  >(new Map());
+  const [venueByEventId, setVenueByEventId] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [eventActionModalOpen, setEventActionModalOpen] = useState(false);
@@ -149,15 +159,46 @@ export default function DashboardPage() {
     return unsub;
   }, []);
 
-  const events = useMemo(
-    () =>
-      mergeAvailabilitiesAndEvents(
-        availabilities,
-        eventOccurrences,
-        participantsByOccurrence
-      ),
-    [availabilities, eventOccurrences, participantsByOccurrence]
-  );
+  useEffect(() => {
+    const q = query(collection(db, "events"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const visMap = new Map<string, EventVisibility>();
+      const recMap = new Map<string, EventRecurrence>();
+      const venueMap = new Map<string, string>();
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        visMap.set(d.id, (data.visibility as EventVisibility) ?? "limited");
+        recMap.set(d.id, (data.recurrence as EventRecurrence) ?? "weekly");
+        if (data.venue && typeof data.venue === "string") venueMap.set(d.id, data.venue);
+      }
+      setVisibilityByEventId(visMap);
+      setRecurrenceByEventId(recMap);
+      setVenueByEventId(venueMap);
+    });
+    return unsub;
+  }, []);
+
+  const events = useMemo(() => {
+    const merged = mergeAvailabilitiesAndEvents(
+      availabilities,
+      eventOccurrences,
+      participantsByOccurrence,
+      visibilityByEventId
+    );
+    // Filter: public events visible to all; limited only to trainers
+    return merged.filter((e) => {
+      if (!e.resource?.isEvent) return true;
+      const vis = e.resource.visibility ?? "limited";
+      if (vis === "public") return true;
+      return isTrainer;
+    });
+  }, [
+    availabilities,
+    eventOccurrences,
+    participantsByOccurrence,
+    visibilityByEventId,
+    isTrainer,
+  ]);
 
   const loadingDone = availabilities.length >= 0;
   useEffect(() => {
@@ -180,58 +221,67 @@ export default function DashboardPage() {
         // Drop off is handled on My Schedule page for consistent registration management
         return;
       }
-      if (isTrainer) {
+      const vis = event.resource.visibility ?? "limited";
+      const canSubscribe =
+        vis === "public" ? isMember : isTrainer;
+      if (canSubscribe) {
         setEventActionModalOpen(true);
       }
     },
-    [isParticipant, isTrainer]
+    [isParticipant, isMember, isTrainer]
   );
 
-  const handleSubscribe = useCallback(async () => {
-    if (!user || !appUser || !selectedEvent?.resource?.eventId) return;
-    setSubscribing(true);
-    try {
-      const eventId = selectedEvent.resource.eventId;
-      const selectedDate = selectedEvent.start;
-      const userName = appUser.displayName || user.displayName || "Anonymous";
+  const handleSubscribe = useCallback(
+    async (scope: "single" | "series") => {
+      if (!user || !appUser || !selectedEvent?.resource?.eventId) return;
+      setSubscribing(true);
+      try {
+        const eventId = selectedEvent.resource.eventId;
+        const selectedDate = selectedEvent.start;
+        const userName = appUser.displayName || user.displayName || "Anonymous";
 
-      const occQuery = query(
-        collection(db, "eventOccurrences"),
-        where("eventId", "==", eventId),
-        where("start", ">=", Timestamp.fromDate(selectedDate)),
-        orderBy("start", "asc")
-      );
-      const occSnap = await getDocs(occQuery);
-      const occurrences = occSnap.docs.map((d) => ({
-        id: d.id,
-        data: d.data(),
-      }));
+        const occQuery = query(
+          collection(db, "eventOccurrences"),
+          where("eventId", "==", eventId),
+          where("start", ">=", Timestamp.fromDate(selectedDate)),
+          orderBy("start", "asc")
+        );
+        const occSnap = await getDocs(occQuery);
+        let occurrences = occSnap.docs.map((d) => ({
+          id: d.id,
+          data: d.data(),
+        }));
+        if (scope === "single") {
+          occurrences = occurrences.slice(0, 1);
+        }
 
-      const batch = writeBatch(db);
-      for (const occ of occurrences) {
-        const existingParticipants = participantsByOccurrence.get(occ.id) ?? [];
-        if (existingParticipants.some((p) => p.userId === user.uid)) continue;
+        const batch = writeBatch(db);
+        for (const occ of occurrences) {
+          const existingParticipants = participantsByOccurrence.get(occ.id) ?? [];
+          if (existingParticipants.some((p) => p.userId === user.uid)) continue;
 
-        const partRef = doc(collection(db, "eventParticipants"));
-        batch.set(partRef, {
-          occurrenceId: occ.id,
-          userId: user.uid,
-          userName,
-          userEmail: user.email ?? "",
-          userPhotoURL: user.photoURL ?? "",
-          subscribedAt: Timestamp.now(),
-        });
+          const partRef = doc(collection(db, "eventParticipants"));
+          batch.set(partRef, {
+            occurrenceId: occ.id,
+            userId: user.uid,
+            userName,
+            userEmail: user.email ?? "",
+            userPhotoURL: user.photoURL ?? "",
+            subscribedAt: Timestamp.now(),
+          });
+        }
+        await batch.commit();
+
+        setEventActionModalOpen(false);
+        setSelectedEvent(null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSubscribing(false);
       }
-      await batch.commit();
-
-      setEventActionModalOpen(false);
-      setSelectedEvent(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubscribing(false);
-    }
-  }, [user, appUser, selectedEvent, participantsByOccurrence]);
+    },
+    [user, appUser, selectedEvent, participantsByOccurrence]
+  );
 
   if (loading) {
     return (
@@ -271,9 +321,11 @@ export default function DashboardPage() {
               {selectedEvent.title}
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Subscribing will add you to this occurrence and all future ones in the series.
+              {recurrenceByEventId.get(selectedEvent.resource?.eventId ?? "") === "none"
+                ? "You are attending this event."
+                : "You are joining this event."}
             </p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm font-bold text-red-700">
               {selectedEvent.start.toLocaleDateString()} ·{" "}
               {selectedEvent.start.toLocaleTimeString([], {
                 hour: "2-digit",
@@ -285,30 +337,63 @@ export default function DashboardPage() {
                 minute: "2-digit",
               })}
             </p>
-            {selectedEvent.resource?.participants && selectedEvent.resource.participants.length > 0 && (
-              <p className="mt-2 text-sm text-gray-600">
-                Participants:{" "}
-                {selectedEvent.resource.participants
-                  .map((p) => p.userName)
-                  .join(", ")}
+            {venueByEventId.get(selectedEvent.resource?.eventId ?? "") && (
+              <p className="mt-1 text-sm text-gray-600">
+                Venue: {venueByEventId.get(selectedEvent.resource?.eventId ?? "")}
               </p>
             )}
-            <div className="mt-6 flex gap-3">
+            {selectedEvent.resource?.participants && selectedEvent.resource.participants.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Participants</p>
+                <ul className="mt-1 space-y-0.5">
+                  {selectedEvent.resource.participants.slice(0, 3).map((p) => (
+                    <li key={p.userId} className="text-sm text-gray-700">
+                      {p.userName}
+                    </li>
+                  ))}
+                  {selectedEvent.resource.participants.length > 3 && (
+                    <li className="text-sm font-medium text-gray-500">
+                      + {selectedEvent.resource.participants.length - 3} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <div className="mt-6 flex flex-col gap-3">
+              {recurrenceByEventId.get(selectedEvent.resource?.eventId ?? "") !== "none" ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSubscribe("single")}
+                    disabled={subscribing}
+                    className="flex-1 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-200 disabled:opacity-50"
+                  >
+                    {subscribing ? "Subscribing…" : "This date only"}
+                  </button>
+                  <button
+                    onClick={() => handleSubscribe("series")}
+                    disabled={subscribing}
+                    className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {subscribing ? "Subscribing…" : "Entire series"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleSubscribe("series")}
+                  disabled={subscribing}
+                  className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {subscribing ? "Subscribing…" : "Subscribe"}
+                </button>
+              )}
               <button
                 onClick={() => {
                   setEventActionModalOpen(false);
                   setSelectedEvent(null);
                 }}
-                className="flex-1 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                className="w-full rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleSubscribe}
-                disabled={subscribing}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {subscribing ? "Subscribing…" : "Subscribe"}
               </button>
             </div>
           </div>

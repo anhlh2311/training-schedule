@@ -28,6 +28,7 @@ export default function TrainersPage() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"trainer" | "member">("trainer");
   const [inviteError, setInviteError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -103,7 +104,7 @@ export default function TrainersPage() {
 
     setSubmitting(true);
     await setDoc(doc(db, "invites", email), {
-      role: "trainer",
+      role: inviteRole,
       createdAt: Timestamp.now(),
     });
 
@@ -145,31 +146,49 @@ export default function TrainersPage() {
       {isAdmin && (
         <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-sm font-semibold text-gray-900">
-            Pre-register Trainer
+            Pre-register Trainer or Member
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-gray-400">
-            Enter an email address to pre-assign the trainer role. When this
-            person signs in with Google, they'll get trainer access immediately.
+            Enter an email address to pre-assign a role. When this person signs
+            in with Google, they'll get that access immediately.
           </p>
-          <form onSubmit={handleInvite} className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <input
+          <form onSubmit={handleInvite} className="mt-4 flex flex-col gap-3">
+            <div className="flex gap-2">
+              {(["trainer", "member"] as const).map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setInviteRole(role)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    inviteRole === role
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {role === "trainer" ? "Trainer" : "Member"}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
               type="email"
               value={inviteEmail}
               onChange={(e) => {
                 setInviteEmail(e.target.value);
                 setInviteError("");
               }}
-              placeholder="trainer@example.com"
+              placeholder="email@example.com"
               required
               className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-300 transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
-            <button
+              <button
               type="submit"
               disabled={submitting}
               className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-40"
             >
               {submitting ? "Adding..." : "Add Invite"}
             </button>
+            </div>
           </form>
           {inviteError && (
             <p className="mt-2 text-xs text-red-400">{inviteError}</p>
@@ -188,7 +207,13 @@ export default function TrainersPage() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700">{inv.email}</span>
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          inv.role === "member"
+                            ? "bg-blue-50 text-blue-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }`}
+                      >
                         {inv.role}
                       </span>
                     </div>

@@ -4,6 +4,7 @@ import RoleActions from "./RoleActions";
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-violet-50 text-violet-600" },
   trainer: { label: "Trainer", className: "bg-emerald-50 text-emerald-600" },
+  member: { label: "Member", className: "bg-blue-50 text-blue-600" },
   user: { label: "User", className: "bg-slate-100 text-slate-500" },
 };
 
@@ -44,7 +45,7 @@ export default function UserTable({ users }: UserTableProps) {
           </thead>
           <tbody>
             {users.map((u, idx) => {
-              const badge = ROLE_BADGE[u.role];
+              const badge = ROLE_BADGE[u.role] ?? ROLE_BADGE.user;
               return (
                 <tr
                   key={u.uid}
@@ -95,7 +96,7 @@ export default function UserTable({ users }: UserTableProps) {
       {/* Mobile card layout */}
       <div className="flex flex-col gap-3 md:hidden">
         {users.map((u) => {
-          const badge = ROLE_BADGE[u.role];
+          const badge = ROLE_BADGE[u.role] ?? ROLE_BADGE.user;
           return (
             <div
               key={u.uid}

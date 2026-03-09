@@ -44,12 +44,37 @@ export default function RoleActions({ target }: RoleActionsProps) {
     <>
       <div className="flex flex-wrap gap-1.5">
         {target.role === "user" && (currentRole === "admin" || currentRole === "trainer") && (
-          <button
-            onClick={() => prompt("trainer", "Make Trainer")}
-            className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-600 transition hover:bg-emerald-100"
-          >
-            Make Trainer
-          </button>
+          <>
+            <button
+              onClick={() => prompt("member", "Make Member")}
+              className="rounded-lg bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-600 transition hover:bg-blue-100"
+            >
+              Make Member
+            </button>
+            <button
+              onClick={() => prompt("trainer", "Make Trainer")}
+              className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-600 transition hover:bg-emerald-100"
+            >
+              Make Trainer
+            </button>
+          </>
+        )}
+
+        {target.role === "member" && currentRole === "admin" && (
+          <>
+            <button
+              onClick={() => prompt("user", "Remove Member")}
+              className="rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-500 transition hover:bg-red-100"
+            >
+              Remove Member
+            </button>
+            <button
+              onClick={() => prompt("trainer", "Make Trainer")}
+              className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-600 transition hover:bg-emerald-100"
+            >
+              Make Trainer
+            </button>
+          </>
         )}
 
         {target.role === "trainer" && !isSelf && currentRole === "admin" && (

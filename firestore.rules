@@ -29,7 +29,7 @@ service cloud.firestore {
                       ||
                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "trainer"
                        && resource.data.role == "user"
-                       && request.resource.data.role == "trainer")
+                       && request.resource.data.role in ["trainer", "member"])
                     );
     }
 

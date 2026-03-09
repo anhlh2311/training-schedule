@@ -28,7 +28,7 @@ export default function App() {
           <Route
             path="/schedule"
             element={
-              <ProtectedRoute requiredRole="trainer">
+              <ProtectedRoute requiredRole="member">
                 <Layout>
                   <SchedulePage />
                 </Layout>
