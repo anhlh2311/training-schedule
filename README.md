@@ -63,6 +63,8 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 
 Trainers receive browser push notifications when availability changes or when someone subscribes/drops off an event. Admins can enable **notification aggregation** under **Settings** so updates are batched (e.g. every 30–60 min for availability, 5–10 min for event-soon changes). The backend is Vercel serverless (`/api/notify` + cron `/api/cron/process-batch`); no Firebase Cloud Functions required.
 
+**Note:** On Vercel Hobby, crons can run only once per day; the batch job is set to 09:00 UTC. For more frequent batching (e.g. every 5–10 min), use Vercel Pro or call `GET /api/cron/process-batch` from an external cron (e.g. cron-job.org) with `Authorization: Bearer <CRON_SECRET>`.
+
 ## Deploying to Vercel
 
 1. Push the repo to GitHub
