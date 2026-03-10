@@ -1,6 +1,32 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
-import { getAuth, getFirestore, getMessaging } from "./lib/firebase-admin";
+import * as admin from "firebase-admin";
+
+function getFirebaseAdmin() {
+  if (admin.apps.length > 0) return admin.app();
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
+  if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
+  }
+  return admin.initializeApp({
+    credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+  });
+}
+
+function getAuth() {
+  return getFirebaseAdmin().auth();
+}
+function getFirestore() {
+  return getFirebaseAdmin().firestore();
+}
+function getMessaging() {
+  return getFirebaseAdmin().messaging();
+}
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
