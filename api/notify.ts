@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
+import { getAuth, getFirestore, getMessaging } from "./lib/firebase-admin";
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -50,8 +51,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { getAuth, getFirestore, getMessaging } = await import("./lib/firebase-admin");
-
     const authHeader = req.headers.authorization;
     const idToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!idToken) {
