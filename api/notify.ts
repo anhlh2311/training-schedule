@@ -87,7 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let decodedToken: { uid: string };
     try {
       decodedToken = await getAuth().verifyIdToken(idToken);
-    } catch {
+    } catch (err) {
+      console.error("[api/notify] verifyIdToken failed:", err);
       safeJson(res, 401, { error: "Invalid token" });
       return;
     }
