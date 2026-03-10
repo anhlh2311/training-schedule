@@ -1,19 +1,23 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const admin = require("firebase-admin");
+import admin from "firebase-admin";
 
 function getFirebaseAdmin() {
-  if (admin.apps?.length > 0) return admin.app();
+  // guard in case apps is undefined
+  if (Array.isArray(admin.apps) && admin.apps.length > 0) return admin.app();
+
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
+  
   if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
+  
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
   }
+  
   return admin.initializeApp({
     credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   });
@@ -70,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     entry.docIds.push(doc.id);
   }
 
-  const trainerUids = await getTrainerUids(db, new Set());
+  const trainerUids = await getTrainerUids(db);
   const tokens = await getFcmTokensForUsers(db, trainerUids);
   const batch = db.batch();
   let sent = 0;
@@ -100,10 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ processed: snapshot.size, sent });
 }
 
-async function getTrainerUids(
-  db: Firestore,
-  _exclude: Set<string>
-): Promise<string[]> {
+async function getTrainerUids(db: Firestore): Promise<string[]> {
   const snap = await db
     .collection("users")
     .where("role", "in", ["trainer", "admin"])
