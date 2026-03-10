@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { app, db } from "../lib/firebase";
 
@@ -8,6 +7,7 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_PUBLIC_KEY as string | und
 /**
  * Registers for FCM, gets token, and saves it to Firestore under users/{uid}/fcmTokens/{tokenId}.
  * Call when user is signed in and is trainer/admin so they can receive push notifications.
+ * Uses dynamic import for firebase/messaging so unsupported environments (e.g. iOS Safari) don't crash the app.
  */
 export function useFcmToken(userId: string | null, enabled: boolean) {
   const registered = useRef(false);
@@ -15,11 +15,13 @@ export function useFcmToken(userId: string | null, enabled: boolean) {
   useEffect(() => {
     const uid = userId;
     if (!uid || !enabled || !VAPID_KEY) return;
+    if (typeof navigator === "undefined" || !navigator.serviceWorker?.register) return;
 
     let cancelled = false;
 
     async function register() {
       try {
+        const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
         const supported = await isSupported();
         if (!supported || cancelled) return;
 
@@ -51,12 +53,14 @@ export function useFcmToken(userId: string | null, enabled: boolean) {
       }
     }
 
-    if (Notification.permission === "granted") {
-      register();
-    } else if (Notification.permission === "default") {
-      Notification.requestPermission().then((p) => {
-        if (p === "granted") register();
-      });
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "granted") {
+        register();
+      } else if (Notification.permission === "default") {
+        Notification.requestPermission().then((p) => {
+          if (p === "granted") register();
+        });
+      }
     }
 
     return () => {
