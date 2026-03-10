@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
-import { getAuth, getFirestore, getMessaging } from "./lib/firebase-admin";
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -36,29 +35,43 @@ function getDefaultSettings(): NotificationSettings {
   };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+function safeJson(res: VercelResponse, status: number, body: object): void {
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
+    res.status(status).json(body);
+  } catch {
+    res.status(status).end(JSON.stringify(body));
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    safeJson(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const { getAuth, getFirestore, getMessaging } = await import("./lib/firebase-admin");
 
     const authHeader = req.headers.authorization;
     const idToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!idToken) {
-      return res.status(401).json({ error: "Missing Authorization header" });
+      safeJson(res, 401, { error: "Missing Authorization header" });
+      return;
     }
 
     let decodedToken: { uid: string };
     try {
       decodedToken = await getAuth().verifyIdToken(idToken);
     } catch {
-      return res.status(401).json({ error: "Invalid token" });
+      safeJson(res, 401, { error: "Invalid token" });
+      return;
     }
 
-    const body = req.body as NotifyBody;
+    const body = (typeof req.body === "object" && req.body !== null ? req.body : {}) as NotifyBody;
     const { type, userId, userName, eventStartTime } = body;
     if (!type || !userId || userId !== decodedToken.uid) {
-      return res.status(400).json({ error: "Invalid body: type and userId required, userId must match token" });
+      safeJson(res, 400, { error: "Invalid body: type and userId required, userId must match token" });
+      return;
     }
 
     const db = getFirestore();
@@ -91,13 +104,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         windowKey,
         actorId: userId,
       });
-      return res.status(202).json({ queued: true, deliverAt: deliverAt.toISOString() });
+      safeJson(res, 202, { queued: true, deliverAt: deliverAt.toISOString() });
+      return;
     }
 
     const trainerUids = await getTrainerUids(db, userId);
     const tokens = await getFcmTokensForUsers(db, trainerUids);
     if (tokens.length === 0) {
-      return res.status(200).json({ sent: 0 });
+      safeJson(res, 200, { sent: 0 });
+      return;
     }
 
     const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer");
@@ -109,14 +124,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const result = await messaging.sendEachForMulticast(message);
-    return res.status(200).json({ sent: result.successCount, failed: result.failureCount });
+    safeJson(res, 200, { sent: result.successCount, failed: result.failureCount });
+    return;
   } catch (err) {
     console.error("[api/notify] error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return res.status(500).json({
+    const message = err instanceof Error ? err.message : String(err);
+    safeJson(res, 500, {
       error: "Notification request failed",
-      ...(process.env.NODE_ENV !== "production" && { detail: message }),
+      detail: message,
     });
+    return;
   }
 }
 

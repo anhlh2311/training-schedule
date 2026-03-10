@@ -312,8 +312,8 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
         >
           {isEvent ? (
             <>
-              <span className="truncate font-medium text-orange-800">
-                {event.title}
+              <span className="min-w-0 shrink-0 truncate text-[0.8rem] font-semibold leading-tight text-orange-900">
+                {event.title || "Event"}
               </span>
               {displayParticipants.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -392,8 +392,10 @@ function CustomEvent({ event }: EventProps<CalendarEvent>) {
 
   if (isEvent) {
     return (
-      <div className="flex items-center gap-1.5 overflow-hidden">
-        <span className="truncate font-medium text-orange-800">{event.title}</span>
+      <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <span className="min-w-0 truncate text-[0.8rem] font-semibold text-orange-900">
+          {event.title || "Event"}
+        </span>
       </div>
     );
   }
