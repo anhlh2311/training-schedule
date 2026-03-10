@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
-import * as admin from "firebase-admin";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const admin = require("firebase-admin");
 
 function getFirebaseAdmin() {
-  if (admin.apps.length > 0) return admin.app();
+  if (admin.apps?.length > 0) return admin.app();
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
