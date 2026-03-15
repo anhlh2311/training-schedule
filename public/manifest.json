@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "name": "Training Schedule",
+  "short_name": "Training Schedule",
+  "description": "Team training availability and schedule",
+  "display": "standalone",
+  "start_url": "/",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "icons": [
+    { "src": "/IHN.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/IHN.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/IHN.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "/IHN.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "id": "/?homescreen=1"
+}

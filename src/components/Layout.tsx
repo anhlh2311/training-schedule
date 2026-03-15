@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
 import { useOneSignal } from "../hooks/useOneSignal";
 import { useTrainerNotifications } from "../hooks/useTrainerNotifications";
+import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
 
@@ -324,6 +325,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           onClose={() => setDuplicateModalOpen(false)}
         />
       </nav>
+
+      {isTrainer && <AddToHomeScreenPrompt />}
 
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
