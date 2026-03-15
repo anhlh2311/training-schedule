@@ -32,6 +32,36 @@ function getMessaging() {
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
+async function sendOneSignal(
+  appId: string,
+  restApiKey: string,
+  externalUserIds: string[],
+  title: string,
+  body: string
+): Promise<number> {
+  const res = await fetch("https://onesignal.com/api/v1/notifications", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Key ${restApiKey}`,
+    },
+    body: JSON.stringify({
+      app_id: appId,
+      include_aliases: { external_id: externalUserIds },
+      target_channel: "push",
+      headings: { en: title },
+      contents: { en: body },
+      data: { url: "/" },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OneSignal API ${res.status}: ${text}`);
+  }
+  const data = (await res.json()) as { recipients?: number };
+  return data.recipients ?? 0;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -75,7 +105,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const trainerUids = await getTrainerUids(db);
-  const tokens = await getFcmTokensForUsers(db, trainerUids);
+  const onesignalAppId = process.env.ONESIGNAL_APP_ID;
+  const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+  const useOneSignal = Boolean(onesignalAppId && onesignalRestApiKey && trainerUids.length > 0);
+  const fcmTokens = useOneSignal ? [] : await getFcmTokensForUsers(db, trainerUids);
   const batch = db.batch();
   let sent = 0;
 
@@ -86,12 +119,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       count === 1
         ? "1 update from a trainer."
         : `${count} availability/event updates.`;
-    if (tokens.length > 0) {
+    if (useOneSignal) {
+      sent += await sendOneSignal(onesignalAppId!, onesignalRestApiKey!, trainerUids, title, body);
+    } else if (fcmTokens.length > 0) {
       const messaging = getMessaging();
       const result = await messaging.sendEachForMulticast({
         notification: { title, body },
         data: { type: entry.type, url: "/" },
-        tokens,
+        tokens: fcmTokens,
       });
       sent += result.successCount;
     }

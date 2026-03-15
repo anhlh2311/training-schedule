@@ -140,20 +140,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const trainerUids = await getTrainerUids(db, userId);
+    const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer");
+
+    const onesignalAppId = process.env.ONESIGNAL_APP_ID;
+    const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+    if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
+      const sent = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
+      safeJson(res, 200, { sent, provider: "onesignal" });
+      return;
+    }
+
     const tokens = await getFcmTokensForUsers(db, trainerUids);
     if (tokens.length === 0) {
       safeJson(res, 200, { sent: 0 });
       return;
     }
 
-    const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer");
     const messaging = getMessaging();
     const message = {
       notification: { title, body: messageBody },
       data: { type, url: "/" },
       tokens,
     };
-
     const result = await messaging.sendEachForMulticast(message);
     safeJson(res, 200, { sent: result.successCount, failed: result.failureCount });
     return;
@@ -194,6 +202,36 @@ async function getFcmTokensForUsers(
     }
   }
   return tokens;
+}
+
+async function sendOneSignal(
+  appId: string,
+  restApiKey: string,
+  externalUserIds: string[],
+  title: string,
+  body: string
+): Promise<number> {
+  const res = await fetch("https://onesignal.com/api/v1/notifications", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Key ${restApiKey}`,
+    },
+    body: JSON.stringify({
+      app_id: appId,
+      include_aliases: { external_id: externalUserIds },
+      target_channel: "push",
+      headings: { en: title },
+      contents: { en: body },
+      data: { url: "/" },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OneSignal API ${res.status}: ${text}`);
+  }
+  const data = (await res.json()) as { recipients?: number };
+  return data.recipients ?? 0;
 }
 
 function formatMessage(
