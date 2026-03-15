@@ -62,7 +62,7 @@ export default function AddToHomeScreenPrompt() {
       <div>
         <p className="font-medium">Get notifications on this device</p>
         <p className="mt-0.5 text-blue-800">
-          Tap the browser&apos;s Share button, then &quot;Add to Home Screen&quot;. Open the app from your home screen to receive push notifications.
+          1) Tap Share 2) &quot;Add to Home Screen&quot; 3) Open the app from your home screen 4) Allow notifications when prompted.
         </p>
       </div>
       <button
