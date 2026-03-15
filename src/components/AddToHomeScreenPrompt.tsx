@@ -5,19 +5,30 @@ const DISMISS_KEY = "training-schedule-ios-add-to-home-dismissed";
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const platform = navigator.platform ?? "";
+  return (
+    /iPad|iPhone|iPod/i.test(ua) ||
+    (platform === "MacIntel" && typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1) ||
+    /iPad|iPhone/i.test(platform)
+  );
 }
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return true;
   const nav = navigator as Navigator & { standalone?: boolean };
-  return Boolean(nav.standalone) || window.matchMedia("(display-mode: standalone)").matches;
+  if (nav.standalone === true) return true;
+  try {
+    if (window.matchMedia("(display-mode: standalone)").matches) return true;
+  } catch {
+    // ignore
+  }
+  return false;
 }
 
 /**
  * Shows a dismissible banner on iOS when the app is not opened from the home screen.
  * Explains that adding to home screen is required for push notifications on iPhone/iPad.
- * Only shown to trainers when OneSignal is configured (so push is relevant).
+ * Shown to trainers regardless of push provider (OneSignal/FCM) so iOS users can install the PWA.
  */
 export default function AddToHomeScreenPrompt() {
   const [visible, setVisible] = useState(false);
@@ -29,8 +40,6 @@ export default function AddToHomeScreenPrompt() {
     } catch {
       return;
     }
-    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID as string | undefined;
-    if (!appId) return;
     setVisible(true);
   }, []);
 
