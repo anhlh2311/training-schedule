@@ -9,6 +9,8 @@ const manifest = {
   theme_color: "#2563eb",
   background_color: "#ffffff",
   icons: [
+    { src: "/IHN.png", sizes: "192x192", type: "image/png", purpose: "any" as const },
+    { src: "/IHN.png", sizes: "512x512", type: "image/png", purpose: "any" as const },
     { src: "/IHN.png", sizes: "1280x1280", type: "image/png", purpose: "any" as const },
   ],
   id: "/?homescreen=1",
