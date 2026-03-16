@@ -61,9 +61,12 @@ export default function AddToHomeScreenPrompt() {
     >
       <div>
         <p className="font-medium">Get notifications on this device</p>
-        <p className="mt-0.5 text-blue-800">
-          1) Tap Share 2) &quot;Add to Home Screen&quot; 3) Open the app from your home screen 4) Allow notifications when prompted.
-        </p>
+        <ol className="mt-0.5 list-decimal space-y-0.5 pl-5 text-blue-800">
+          <li>Tap Share in your browser.</li>
+          <li>Select &quot;Add to Home Screen&quot;.</li>
+          <li>Open the app from your home screen.</li>
+          <li>Allow notifications when prompted.</li>
+        </ol>
       </div>
       <button
         type="button"
