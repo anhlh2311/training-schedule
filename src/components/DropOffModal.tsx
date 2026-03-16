@@ -73,6 +73,8 @@ export default function DropOffModal({
           eventId: event.resource.eventId,
           occurrenceId,
           eventStartTime: event.start.toISOString(),
+          eventTitle: event.title,
+          dropOffReason: reasonText,
         });
       } else {
         const eventId = event.resource.eventId;
@@ -120,6 +122,8 @@ export default function DropOffModal({
           userName,
           eventId: event.resource.eventId,
           eventStartTime: event.start.toISOString(),
+          eventTitle: event.title,
+          dropOffReason: reasonText,
         });
       }
 

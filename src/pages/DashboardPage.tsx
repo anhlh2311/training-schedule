@@ -279,6 +279,7 @@ export default function DashboardPage() {
           userName,
           eventId,
           eventStartTime: selectedEvent.start.toISOString(),
+          eventTitle: selectedEvent.title,
         });
         setEventActionModalOpen(false);
         setSelectedEvent(null);

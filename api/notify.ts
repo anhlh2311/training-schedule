@@ -49,6 +49,8 @@ interface NotifyBody {
   eventId?: string;
   occurrenceId?: string;
   eventStartTime?: string; // ISO string
+  eventTitle?: string;
+  dropOffReason?: string;
 }
 
 interface NotificationSettings {
@@ -140,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const trainerUids = await getTrainerUids(db, userId);
-    const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer");
+    const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer", body);
 
     const onesignalAppId = process.env.ONESIGNAL_APP_ID;
     const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
@@ -236,8 +238,22 @@ async function sendOneSignal(
 
 function formatMessage(
   type: NotifyType,
-  userName: string
+  userName: string,
+  payload: NotifyBody
 ): { title: string; body: string } {
+  const time =
+    payload.eventStartTime
+      ? new Date(payload.eventStartTime).toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
+  const eventLabel = payload.eventTitle || "an event";
+  const timeSuffix = time ? ` at ${time}` : "";
+
   switch (type) {
     case "availability_added":
       return {
@@ -252,12 +268,14 @@ function formatMessage(
     case "event_subscribe":
       return {
         title: "Event subscription",
-        body: `${userName} joined an event.`,
+        body: `${userName} joined ${eventLabel}${timeSuffix}.`,
       };
     case "event_drop_off":
       return {
         title: "Event drop-off",
-        body: `${userName} dropped off from an event.`,
+        body: `${userName} dropped off from ${eventLabel}${timeSuffix}${
+          payload.dropOffReason ? ` — Reason: ${payload.dropOffReason}` : ""
+        }.`,
       };
     default:
       return { title: "Training Schedule", body: "Update from a trainer." };
