@@ -137,24 +137,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         windowKey,
         actorId: userId,
       });
-      safeJson(res, 202, { queued: true, deliverAt: deliverAt.toISOString() });
+      const queuedFormatted = formatMessage(type, userName ?? "A trainer", body);
+      safeJson(res, 202, {
+        queued: true,
+        deliverAt: deliverAt.toISOString(),
+        debug: {
+          type,
+          payloadSummary: {
+            eventTitle: body.eventTitle,
+            eventStartTime: body.eventStartTime,
+            dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
+          },
+          formatted: { title: queuedFormatted.title, body: queuedFormatted.body },
+        },
+      });
       return;
     }
 
     const trainerUids = await getTrainerUids(db, userId);
     const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer", body);
+    const debug = {
+      type,
+      payloadSummary: {
+        eventTitle: body.eventTitle,
+        eventStartTime: body.eventStartTime,
+        dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
+      },
+      formatted: { title, body: messageBody },
+      trainerCount: trainerUids.length,
+    };
 
     const onesignalAppId = process.env.ONESIGNAL_APP_ID;
     const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
     if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
       const sent = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
-      safeJson(res, 200, { sent, provider: "onesignal" });
+      safeJson(res, 200, { sent, provider: "onesignal", debug: { ...debug, tokenCount: undefined } });
       return;
     }
 
     const tokens = await getFcmTokensForUsers(db, trainerUids);
     if (tokens.length === 0) {
-      safeJson(res, 200, { sent: 0 });
+      safeJson(res, 200, { sent: 0, debug: { ...debug, tokenCount: 0 } });
       return;
     }
 
@@ -165,7 +188,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);
-    safeJson(res, 200, { sent: result.successCount, failed: result.failureCount });
+    safeJson(res, 200, {
+      sent: result.successCount,
+      failed: result.failureCount,
+      debug: { ...debug, tokenCount: tokens.length },
+    });
     return;
   } catch (err) {
     console.error("[api/notify] error:", err);
