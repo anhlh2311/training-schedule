@@ -163,7 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         eventStartTime: body.eventStartTime,
         dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
       },
-      formatted: { title, body: messageBody },
+      formatted: { title, body: messageBody + "[TEST]" },
       trainerCount: trainerUids.length,
     };
 
