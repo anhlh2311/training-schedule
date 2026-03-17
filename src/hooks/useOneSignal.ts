@@ -9,31 +9,33 @@ declare global {
 }
 
 /**
- * Initializes OneSignal and identifies the user by Firebase UID (external_id).
- * Call when user is signed in and is trainer/admin so they can receive push notifications.
+ * Links the current OneSignal subscription to the user's Firebase UID (external_id).
+ * Init runs in index.html so the permission prompt appears early; we only call login here
+ * when the user is a logged-in trainer so their subscription gets the external_id for targeting.
  */
 export function useOneSignal(userId: string | null, enabled: boolean) {
-  const inited = useRef(false);
+  const loggedIn = useRef(false);
 
   useEffect(() => {
     const uid = userId;
-    if (!uid || !enabled || !ONESIGNAL_APP_ID) return;
+    if (!uid || !enabled) return;
+    if (!ONESIGNAL_APP_ID) {
+      console.error(
+        "[Training Schedule] OneSignal App ID is not configured. Set VITE_ONESIGNAL_APP_ID in your build environment and ONESIGNAL_APP_ID for the API. See .env.example for details."
+      );
+      return;
+    }
     if (typeof window === "undefined" || !window.OneSignalDeferred) return;
 
     const run = () => {
-      if (inited.current) return;
+      if (loggedIn.current) return;
       window.OneSignalDeferred!.push(async (OneSignal) => {
         try {
-          await OneSignal.init({
-            appId: ONESIGNAL_APP_ID,
-            serviceWorkerParam: { scope: "/" },
-            serviceWorkerPath: "OneSignalSDKWorker.js",
-          });
           await OneSignal.login(uid);
-          inited.current = true;
+          loggedIn.current = true;
         } catch (err) {
           if (import.meta.env.DEV) {
-            console.warn("OneSignal init/login failed (optional):", err);
+            console.warn("OneSignal login failed (optional):", err);
           }
         }
       });

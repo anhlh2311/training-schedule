@@ -77,6 +77,26 @@ function safeJson(res: VercelResponse, status: number, body: object): void {
   }
 }
 
+function buildDebugInfo(
+  body: NotifyBody,
+  type: NotifyType,
+  senderId: string,
+  trainerUids: string[],
+  formatted: { title: string; body: string }
+): { type: NotifyType; payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; dropOffReason?: string }; formatted: { title: string; body: string } } {
+  return {
+    type,
+    payloadSummary: {
+      senderId,
+      trainerUids,
+      eventTitle: body.eventTitle,
+      eventStartTime: body.eventStartTime,
+      dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
+    },
+    formatted: { title: formatted.title, body: formatted.body },
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     safeJson(res, 405, { error: "Method not allowed" });
@@ -137,33 +157,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         windowKey,
         actorId: userId,
       });
-      const queuedFormatted = formatMessage(type, userName ?? "A trainer", body);
-      safeJson(res, 202, {
-        queued: true,
-        deliverAt: deliverAt.toISOString(),
-        debug: {
-          type,
-          payloadSummary: {
-            eventTitle: body.eventTitle,
-            eventStartTime: body.eventStartTime,
-            dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
-          },
-          formatted: { title: queuedFormatted.title, body: queuedFormatted.body },
-        },
-      });
+      const formatted = formatMessage(type, userName ?? "A trainer", body);
+      const debug = buildDebugInfo(body, type, userId, [], formatted);
+      safeJson(res, 202, { queued: true, deliverAt: deliverAt.toISOString(), debug });
       return;
     }
 
     const trainerUids = await getTrainerUids(db, userId);
-    const { title, body: messageBody } = formatMessage(type, userName ?? "A trainer", body);
+    const formatted = formatMessage(type, userName ?? "A trainer", body);
+    const { title, body: messageBody } = formatted;
     const debug = {
-      type,
-      payloadSummary: {
-        eventTitle: body.eventTitle,
-        eventStartTime: body.eventStartTime,
-        dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
-      },
-      formatted: { title, body: messageBody + "[TEST]" },
+      ...buildDebugInfo(body, type, userId, trainerUids, formatted),
       trainerCount: trainerUids.length,
     };
 
@@ -305,6 +309,6 @@ function formatMessage(
         }.`,
       };
     default:
-      return { title: "Training Schedule", body: "Update from a trainer." };
+      return { title: "[IHN Training Schedule]", body: "Update from a trainer." };
   }
 }
