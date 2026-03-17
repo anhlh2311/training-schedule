@@ -6,12 +6,17 @@
     <link rel="manifest" href="/api/manifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2563eb" />
-    <title>Training Schedule</title>
+    <title>Iaido Hanoi Training Schedule</title>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(async function(OneSignal) {
+        var appId = "__VITE_ONESIGNAL_APP_ID__";
+        if (!appId) {
+          console.error("[Training Schedule] OneSignal App ID is not configured. Set VITE_ONESIGNAL_APP_ID in your build environment and ONESIGNAL_APP_ID for the API. See .env.example for details.");
+          return;
+        }
         await OneSignal.init({
-          appId: "__VITE_ONESIGNAL_APP_ID__",
+          appId: appId,
         });
       });
     </script>

@@ -18,7 +18,13 @@ export function useOneSignal(userId: string | null, enabled: boolean) {
 
   useEffect(() => {
     const uid = userId;
-    if (!uid || !enabled || !ONESIGNAL_APP_ID) return;
+    if (!uid || !enabled) return;
+    if (!ONESIGNAL_APP_ID) {
+      console.error(
+        "[Training Schedule] OneSignal App ID is not configured. Set VITE_ONESIGNAL_APP_ID in your build environment and ONESIGNAL_APP_ID for the API. See .env.example for details."
+      );
+      return;
+    }
     if (typeof window === "undefined" || !window.OneSignalDeferred) return;
 
     const run = () => {

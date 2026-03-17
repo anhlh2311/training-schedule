@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID || '0efb7e8f-8743-4f1c-9ea7-c559f73e410f'
+const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID ?? ''
 
 export default defineConfig({
   plugins: [
