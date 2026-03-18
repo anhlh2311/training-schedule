@@ -14,8 +14,22 @@ export interface NotifyPayload {
 	eventId?: string;
 	occurrenceId?: string;
 	eventStartTime?: string;
+	/** Pre-formatted in client's timezone (e.g. "Mar 21, 2026, 1:30 PM GMT+7"). Used in notification body. */
+	eventStartTimeFormatted?: string;
 	eventTitle?: string;
 	dropOffReason?: string;
+}
+
+/** Format a Date for notification body in the client's local timezone. */
+export function formatEventStartForNotify(date: Date): string {
+	return date.toLocaleString(undefined, {
+		year: "numeric",
+		month: "short",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		timeZoneName: "short",
+	});
 }
 
 /**

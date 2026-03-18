@@ -49,6 +49,8 @@ interface NotifyBody {
   eventId?: string;
   occurrenceId?: string;
   eventStartTime?: string; // ISO string
+  /** Pre-formatted in client's timezone. Used in notification body when present. */
+  eventStartTimeFormatted?: string;
   eventTitle?: string;
   dropOffReason?: string;
 }
@@ -83,7 +85,7 @@ function buildDebugInfo(
   senderId: string,
   trainerUids: string[],
   formatted: { title: string; body: string }
-): { type: NotifyType; payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; dropOffReason?: string }; formatted: { title: string; body: string } } {
+): { type: NotifyType; payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; eventStartTimeFormatted?: string; dropOffReason?: string }; formatted: { title: string; body: string } } {
   return {
     type,
     payloadSummary: {
@@ -91,6 +93,7 @@ function buildDebugInfo(
       trainerUids,
       eventTitle: body.eventTitle,
       eventStartTime: body.eventStartTime,
+      eventStartTimeFormatted: body.eventStartTimeFormatted,
       dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
     },
     formatted: { title: formatted.title, body: formatted.body },
@@ -273,15 +276,17 @@ function formatMessage(
   payload: NotifyBody
 ): { title: string; body: string } {
   const time =
-    payload.eventStartTime
+    payload.eventStartTimeFormatted ??
+    (payload.eventStartTime
       ? new Date(payload.eventStartTime).toLocaleString("en-US", {
           year: "numeric",
           month: "short",
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
+          timeZoneName: "short",
         })
-      : null;
+      : null);
   const eventLabel = payload.eventTitle || "an event";
   const timeSuffix = time ? ` at ${time}` : "";
 
