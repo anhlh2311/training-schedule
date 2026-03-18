@@ -6,8 +6,9 @@ import {
   type ReactNode,
 } from "react";
 import {
+  getRedirectResult,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   updateProfile,
   type User,
@@ -149,7 +150,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function initAuth() {
+      try {
+        await getRedirectResult(auth);
+      } catch (err) {
+        if (!cancelled) console.warn("Redirect sign-in error:", err);
+      }
+    }
+    initAuth();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (cancelled) return;
       setUser(firebaseUser);
       if (!firebaseUser) {
         setAppUser(null);
@@ -157,9 +170,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       await upsertUserDoc(firebaseUser);
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     });
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -192,13 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signInWithGoogle() {
     if (isEmbeddedBrowserFlag) return;
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: unknown) {
-      const code = (error as { code?: string }).code;
-      if (code === "auth/popup-closed-by-user") return;
-      throw error;
-    }
+    await signInWithRedirect(auth, googleProvider);
   }
 
   async function signOut() {
