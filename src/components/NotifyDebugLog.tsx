@@ -63,56 +63,58 @@ export default function NotifyDebugLog() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[280px] flex-col rounded-t-xl border border-gray-600 bg-[#1a1d23] font-mono text-sm shadow-lg"
+      className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8"
       style={{ fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" }}
     >
-      <div className="flex items-center justify-between border-b border-gray-600 px-4 py-2">
-        <span className="font-semibold text-white">Log</span>
-        <button
-          type="button"
-          onClick={clear}
-          className="rounded px-2 py-0.5 text-gray-400 transition hover:bg-gray-700 hover:text-gray-200"
+      <div className="flex max-h-[280px] flex-col rounded-xl border border-gray-200 bg-white font-mono text-sm shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+          <span className="font-semibold text-gray-900">Log</span>
+          <button
+            type="button"
+            onClick={clear}
+            className="rounded px-2 py-0.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+          >
+            Clear
+          </button>
+        </div>
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto overflow-x-auto p-3"
+          style={{ minHeight: 120 }}
         >
-          Clear
-        </button>
-      </div>
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-auto p-3"
-        style={{ minHeight: 120 }}
-      >
-        <div className="space-y-0.5 rounded border border-gray-700 bg-[#0d0f12] p-3">
-          {entries.length === 0 ? (
-            <div className="text-gray-500">Waiting for notify requests…</div>
-          ) : (
-            entries.map((e) => (
-              <div key={e.id} className="flex gap-2 break-all">
-                <span className="shrink-0 text-gray-500">{e.timestamp}</span>
-                <span
-                  className={
-                    e.type === "success"
-                      ? "text-emerald-400"
-                      : e.type === "error"
-                        ? "text-red-400"
-                        : "text-gray-300"
-                  }
-                >
-                  {String(e.message)}
-                </span>
-              </div>
-            ))
+          <div className="space-y-0.5 rounded border border-gray-200 bg-gray-50 p-3">
+            {entries.length === 0 ? (
+              <div className="text-gray-500">Waiting for notify requests…</div>
+            ) : (
+              entries.map((e) => (
+                <div key={e.id} className="flex gap-2 break-all">
+                  <span className="shrink-0 text-gray-500">{e.timestamp}</span>
+                  <span
+                    className={
+                      e.type === "success"
+                        ? "text-emerald-600"
+                        : e.type === "error"
+                          ? "text-red-600"
+                          : "text-gray-700"
+                    }
+                  >
+                    {String(e.message)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          {entries.length > 0 && entries[entries.length - 1].detail != null && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                Latest response
+              </summary>
+              <pre className="mt-1 overflow-x-auto rounded bg-gray-50 border border-gray-200 p-2 text-xs text-gray-600">
+                {String(JSON.stringify(entries[entries.length - 1]?.detail ?? {}, null, 2))}
+              </pre>
+            </details>
           )}
         </div>
-        {entries.length > 0 && entries[entries.length - 1].detail != null && (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-gray-500 hover:text-gray-400">
-              Latest response
-            </summary>
-            <pre className="mt-1 overflow-x-auto rounded bg-[#0d0f12] p-2 text-xs text-gray-400">
-              {String(JSON.stringify(entries[entries.length - 1]?.detail ?? {}, null, 2))}
-            </pre>
-          </details>
-        )}
       </div>
     </div>
   );
