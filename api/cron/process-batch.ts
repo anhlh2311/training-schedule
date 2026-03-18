@@ -47,8 +47,7 @@ async function sendOneSignal(
     },
     body: JSON.stringify({
       app_id: appId,
-      include_aliases: { external_id: externalUserIds },
-      target_channel: "push",
+      include_external_user_ids: externalUserIds,
       headings: { en: title },
       contents: { en: body },
       data: { url: "/" },
