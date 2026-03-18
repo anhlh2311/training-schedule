@@ -6,6 +6,7 @@ import { useOneSignal } from "../hooks/useOneSignal";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
+import NotifyDebugLog from "./NotifyDebugLog";
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-purple-100 text-purple-700" },
@@ -329,6 +330,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
       </main>
+
+      <NotifyDebugLog />
     </div>
   );
 }

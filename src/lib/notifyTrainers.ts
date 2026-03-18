@@ -1,4 +1,5 @@
 import { auth } from "./firebase";
+import { dispatchNotifyDebug } from "./notifyDebug";
 
 export type NotifyEventType =
 	| "availability_added"
@@ -36,6 +37,9 @@ export function formatEventStartForNotify(date: Date): string {
  * Notify other trainers via the backend (push or queue).
  * Call after a successful Firestore write. Failures are logged but not thrown.
  */
+const NOTIFY_DEBUG =
+	import.meta.env.VITE_NOTIFY_DEBUG === "true" || import.meta.env.VITE_NOTIFY_DEBUG === "1";
+
 export async function notifyTrainers(payload: NotifyPayload): Promise<void> {
 	const user = auth.currentUser;
 	if (!user) return;
@@ -49,14 +53,25 @@ export async function notifyTrainers(payload: NotifyPayload): Promise<void> {
 			},
 			body: JSON.stringify(payload),
 		});
+		const response = await res.json().catch(() => ({}));
+		if (NOTIFY_DEBUG) {
+			dispatchNotifyDebug({
+				payload: payload as unknown as { type: string; [key: string]: unknown },
+				status: res.status,
+				response,
+			});
+		}
 		if (!res.ok && import.meta.env.DEV) {
-			console.warn(
-				"notifyTrainers failed:",
-				res.status,
-				await res.text(),
-			);
+			console.warn("notifyTrainers failed:", res.status, response);
 		}
 	} catch (err) {
+		if (NOTIFY_DEBUG) {
+			dispatchNotifyDebug({
+				payload: payload as unknown as { type: string; [key: string]: unknown },
+				status: 0,
+				response: { error: String(err) },
+			});
+		}
 		if (import.meta.env.DEV) {
 			console.warn("notifyTrainers error:", err);
 		}
