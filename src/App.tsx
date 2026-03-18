@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -5,10 +6,19 @@ import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import SchedulePage from "./pages/SchedulePage";
-import UsersPage from "./pages/admin/UsersPage";
-import TrainersPage from "./pages/admin/TrainersPage";
-import EventsPage from "./pages/admin/EventsPage";
-import NotificationSettingsPage from "./pages/admin/NotificationSettingsPage";
+
+const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
+const TrainersPage = lazy(() => import("./pages/admin/TrainersPage"));
+const EventsPage = lazy(() => import("./pages/admin/EventsPage"));
+const NotificationSettingsPage = lazy(() => import("./pages/admin/NotificationSettingsPage"));
+
+function PageFallback() {
+  return (
+    <div className="flex justify-center py-20">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -41,7 +51,9 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="trainer">
                 <Layout>
-                  <UsersPage />
+                  <Suspense fallback={<PageFallback />}>
+                    <UsersPage />
+                  </Suspense>
                 </Layout>
               </ProtectedRoute>
             }
@@ -51,7 +63,9 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="trainer">
                 <Layout>
-                  <TrainersPage />
+                  <Suspense fallback={<PageFallback />}>
+                    <TrainersPage />
+                  </Suspense>
                 </Layout>
               </ProtectedRoute>
             }
@@ -61,7 +75,9 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <Layout>
-                  <EventsPage />
+                  <Suspense fallback={<PageFallback />}>
+                    <EventsPage />
+                  </Suspense>
                 </Layout>
               </ProtectedRoute>
             }
@@ -71,7 +87,9 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <Layout>
-                  <NotificationSettingsPage />
+                  <Suspense fallback={<PageFallback />}>
+                    <NotificationSettingsPage />
+                  </Suspense>
                 </Layout>
               </ProtectedRoute>
             }

@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
 import { useOneSignal } from "../hooks/useOneSignal";
-import { useTrainerNotifications } from "../hooks/useTrainerNotifications";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
@@ -21,7 +20,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useOneSignal(user?.uid ?? null, isTrainer);
   useFcmToken(user?.uid ?? null, isTrainer);
-  useTrainerNotifications(user?.uid ?? null, isTrainer);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
