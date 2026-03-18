@@ -1,1 +1,2 @@
-importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
+// Load from same origin to avoid ad blockers blocking cdn.onesignal.com
+importScripts("/OneSignalSDK.sw.js");
