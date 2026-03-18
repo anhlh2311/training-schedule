@@ -35,6 +35,10 @@ function getMessaging() {
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+/** When true, include debug info (payloadSummary, formatted, onesignal request/response) in API responses. */
+const NOTIFY_DEBUG =
+  process.env.NOTIFY_DEBUG === "true" || process.env.NOTIFY_DEBUG === "1";
+
 type NotifyType =
   | "availability_added"
   | "availability_removed"
@@ -49,6 +53,8 @@ interface NotifyBody {
   eventId?: string;
   occurrenceId?: string;
   eventStartTime?: string; // ISO string
+  /** Pre-formatted in client's timezone. Used in notification body when present. */
+  eventStartTimeFormatted?: string;
   eventTitle?: string;
   dropOffReason?: string;
 }
@@ -77,24 +83,43 @@ function safeJson(res: VercelResponse, status: number, body: object): void {
   }
 }
 
+interface OneSignalDebug {
+  requestPayload: object;
+  response: { status: number; body: unknown };
+}
+
 function buildDebugInfo(
   body: NotifyBody,
   type: NotifyType,
   senderId: string,
   trainerUids: string[],
-  formatted: { title: string; body: string }
-): { type: NotifyType; payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; dropOffReason?: string }; formatted: { title: string; body: string } } {
-  return {
+  formatted: { title: string; body: string },
+  onesignal?: OneSignalDebug
+): {
+  type: NotifyType;
+  payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; eventStartTimeFormatted?: string; dropOffReason?: string };
+  formatted: { title: string; body: string };
+  onesignal?: OneSignalDebug;
+} {
+  const debug: {
+    type: NotifyType;
+    payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; eventStartTimeFormatted?: string; dropOffReason?: string };
+    formatted: { title: string; body: string };
+    onesignal?: OneSignalDebug;
+  } = {
     type,
     payloadSummary: {
       senderId,
       trainerUids,
       eventTitle: body.eventTitle,
       eventStartTime: body.eventStartTime,
+      eventStartTimeFormatted: body.eventStartTimeFormatted,
       dropOffReason: body.dropOffReason != null ? "(present)" : undefined,
     },
     formatted: { title: formatted.title, body: formatted.body },
   };
+  if (onesignal) debug.onesignal = onesignal;
+  return debug;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -158,30 +183,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         actorId: userId,
       });
       const formatted = formatMessage(type, userName ?? "A trainer", body);
-      const debug = buildDebugInfo(body, type, userId, [], formatted);
-      safeJson(res, 202, { queued: true, deliverAt: deliverAt.toISOString(), debug });
+      const response: { queued: boolean; deliverAt: string; debug?: ReturnType<typeof buildDebugInfo> } = {
+        queued: true,
+        deliverAt: deliverAt.toISOString(),
+      };
+      if (NOTIFY_DEBUG) response.debug = buildDebugInfo(body, type, userId, [], formatted);
+      safeJson(res, 202, response);
       return;
     }
 
     const trainerUids = await getTrainerUids(db, userId);
     const formatted = formatMessage(type, userName ?? "A trainer", body);
     const { title, body: messageBody } = formatted;
-    const debug = {
-      ...buildDebugInfo(body, type, userId, trainerUids, formatted),
-      trainerCount: trainerUids.length,
-    };
 
     const onesignalAppId = process.env.ONESIGNAL_APP_ID;
     const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
     if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
-      const sent = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
-      safeJson(res, 200, { sent, provider: "onesignal", debug: { ...debug, tokenCount: undefined } });
+      const onesignalResult = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
+      const onesignalDebug: OneSignalDebug = {
+        requestPayload: onesignalResult.requestPayload,
+        response: onesignalResult.response,
+      };
+      const debugWithOneSignal = {
+        ...buildDebugInfo(body, type, userId, trainerUids, formatted, onesignalDebug),
+        trainerCount: trainerUids.length,
+      };
+      if (onesignalResult.error) {
+        console.error("[api/notify] OneSignal error:", onesignalResult.error);
+        const errorResponse: { error: string; detail: string; debug?: typeof debugWithOneSignal } = {
+          error: "OneSignal notification failed",
+          detail: onesignalResult.error,
+        };
+        if (NOTIFY_DEBUG) errorResponse.debug = debugWithOneSignal;
+        safeJson(res, 500, errorResponse);
+        return;
+      }
+      const successResponse: { sent: number; provider: string; debug?: typeof debugWithOneSignal } = {
+        sent: onesignalResult.sent,
+        provider: "onesignal",
+      };
+      if (NOTIFY_DEBUG) successResponse.debug = debugWithOneSignal;
+      safeJson(res, 200, successResponse);
       return;
     }
 
     const tokens = await getFcmTokensForUsers(db, trainerUids);
     if (tokens.length === 0) {
-      safeJson(res, 200, { sent: 0, debug: { ...debug, tokenCount: 0 } });
+      const response: { sent: number; debug?: object } = { sent: 0 };
+      if (NOTIFY_DEBUG) {
+        response.debug = {
+          ...buildDebugInfo(body, type, userId, trainerUids, formatted),
+          trainerCount: trainerUids.length,
+          tokenCount: 0,
+        };
+      }
+      safeJson(res, 200, response);
       return;
     }
 
@@ -192,11 +248,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);
-    safeJson(res, 200, {
+    const fcmResponse: { sent: number; failed?: number; debug?: object } = {
       sent: result.successCount,
       failed: result.failureCount,
-      debug: { ...debug, tokenCount: tokens.length },
-    });
+    };
+    if (NOTIFY_DEBUG) {
+      fcmResponse.debug = {
+        ...buildDebugInfo(body, type, userId, trainerUids, formatted),
+        trainerCount: trainerUids.length,
+        tokenCount: tokens.length,
+      };
+    }
+    safeJson(res, 200, fcmResponse);
     return;
   } catch (err) {
     console.error("[api/notify] error:", err);
@@ -237,34 +300,57 @@ async function getFcmTokensForUsers(
   return tokens;
 }
 
+interface OneSignalResult {
+  sent: number;
+  requestPayload: object;
+  response: { status: number; body: unknown };
+  error?: string;
+}
+
 async function sendOneSignal(
   appId: string,
   restApiKey: string,
   externalUserIds: string[],
   title: string,
   body: string
-): Promise<number> {
+): Promise<OneSignalResult> {
+  const requestPayload = {
+    app_id: appId,
+    include_aliases: { external_id: externalUserIds },
+    target_channel: "push",
+    headings: { en: title },
+    contents: { en: body },
+    data: { url: "/" },
+  };
+
   const res = await fetch("https://onesignal.com/api/v1/notifications", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Key ${restApiKey}`,
     },
-    body: JSON.stringify({
-      app_id: appId,
-      include_aliases: { external_id: externalUserIds },
-      target_channel: "push",
-      headings: { en: title },
-      contents: { en: body },
-      data: { url: "/" },
-    }),
+    body: JSON.stringify(requestPayload),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OneSignal API ${res.status}: ${text}`);
+
+  const text = await res.text();
+  let responseBody: unknown;
+  try {
+    responseBody = text ? (JSON.parse(text) as unknown) : {};
+  } catch {
+    responseBody = text || "(empty body)";
   }
-  const data = (await res.json()) as { recipients?: number };
-  return data.recipients ?? 0;
+
+  const result: OneSignalResult = {
+    sent: res.ok ? ((responseBody as { recipients?: number }).recipients ?? 0) : 0,
+    requestPayload,
+    response: { status: res.status, body: responseBody },
+  };
+
+  if (!res.ok) {
+    result.error = `OneSignal API ${res.status}: ${JSON.stringify(responseBody)}`;
+  }
+
+  return result;
 }
 
 function formatMessage(
@@ -273,15 +359,17 @@ function formatMessage(
   payload: NotifyBody
 ): { title: string; body: string } {
   const time =
-    payload.eventStartTime
+    payload.eventStartTimeFormatted ??
+    (payload.eventStartTime
       ? new Date(payload.eventStartTime).toLocaleString("en-US", {
           year: "numeric",
           month: "short",
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
+          timeZoneName: "short",
         })
-      : null;
+      : null);
   const eventLabel = payload.eventTitle || "an event";
   const timeSuffix = time ? ` at ${time}` : "";
 

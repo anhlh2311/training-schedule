@@ -6,6 +6,7 @@ import { useOneSignal } from "../hooks/useOneSignal";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
+import NotifyDebugLog from "./NotifyDebugLog";
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-purple-100 text-purple-700" },
@@ -18,7 +19,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, appUser, isTrainer, isMember, isAdmin, signOut, updateDisplayName } = useAuth();
   const location = useLocation();
 
-  useOneSignal(user?.uid ?? null, isTrainer);
+  useOneSignal(user?.uid ?? null, isTrainer, user?.email ?? null);
   useFcmToken(user?.uid ?? null, isTrainer);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -329,6 +330,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
       </main>
+
+      <NotifyDebugLog />
     </div>
   );
 }

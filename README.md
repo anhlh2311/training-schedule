@@ -62,6 +62,8 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `FIREBASE_PRIVATE_KEY` | Service account private key (JSON key; keep newlines or use `\n`) |
 | `ONESIGNAL_APP_ID` | OneSignal App ID. Must match `VITE_ONESIGNAL_APP_ID`. |
 | `ONESIGNAL_REST_API_KEY` | OneSignal REST API key (Settings > Keys & IDs). Required for sending push notifications. |
+| `NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to include debug info (payloadSummary, OneSignal request/response) in `/api/notify` responses. Useful for staging. |
+| `VITE_NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to show a log panel at the bottom of the page with notify API responses. Use with `NOTIFY_DEBUG`. |
 | `CRON_SECRET` | (Optional) Secret for securing `/api/cron/process-batch` if not using Vercel Cron |
 
 ## Push Notifications (OneSignal)

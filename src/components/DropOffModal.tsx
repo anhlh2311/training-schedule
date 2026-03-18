@@ -12,7 +12,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { notifyTrainers } from "../lib/notifyTrainers";
+import { notifyTrainers, formatEventStartForNotify } from "../lib/notifyTrainers";
 import { useAuth } from "../context/AuthContext";
 import type { CalendarEvent } from "../types";
 
@@ -73,6 +73,7 @@ export default function DropOffModal({
           eventId: event.resource.eventId,
           occurrenceId,
           eventStartTime: event.start.toISOString(),
+          eventStartTimeFormatted: formatEventStartForNotify(event.start),
           eventTitle: event.title,
           dropOffReason: reasonText,
         });
@@ -122,6 +123,7 @@ export default function DropOffModal({
           userName,
           eventId: event.resource.eventId,
           eventStartTime: event.start.toISOString(),
+          eventStartTimeFormatted: formatEventStartForNotify(event.start),
           eventTitle: event.title,
           dropOffReason: reasonText,
         });
