@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
+import {
+  getPushSubscriptionIdsFromDb,
+  sendOneSignalPush,
+} from "../lib/onesignal";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -31,35 +35,6 @@ function getMessaging() {
 }
 
 const CRON_SECRET = process.env.CRON_SECRET;
-
-async function sendOneSignal(
-  appId: string,
-  restApiKey: string,
-  externalUserIds: string[],
-  title: string,
-  body: string
-): Promise<number> {
-  const res = await fetch("https://onesignal.com/api/v1/notifications", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Key ${restApiKey}`,
-    },
-    body: JSON.stringify({
-      app_id: appId,
-      include_external_user_ids: externalUserIds,
-      headings: { en: title },
-      contents: { en: body },
-      data: { url: "/" },
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OneSignal API ${res.status}: ${text}`);
-  }
-  const data = (await res.json()) as { recipients?: number };
-  return data.recipients ?? 0;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET" && req.method !== "POST") {
@@ -108,6 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
   const useOneSignal = Boolean(onesignalAppId && onesignalRestApiKey && trainerUids.length > 0);
   const fcmTokens = useOneSignal ? [] : await getFcmTokensForUsers(db, trainerUids);
+  const subscriptionIds = useOneSignal
+    ? await getPushSubscriptionIdsFromDb(db, trainerUids)
+    : [];
   const batch = db.batch();
   let sent = 0;
 
@@ -119,7 +97,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? "1 update from a trainer."
         : `${count} availability/event updates.`;
     if (useOneSignal) {
-      sent += await sendOneSignal(onesignalAppId!, onesignalRestApiKey!, trainerUids, title, body);
+      const result = await sendOneSignalPush(
+        onesignalAppId!,
+        onesignalRestApiKey!,
+        subscriptionIds,
+        title,
+        body
+      );
+      sent += result.sent;
+      if (result.error) {
+        console.error("[process-batch] OneSignal:", result.error);
+      }
     } else if (fcmTokens.length > 0) {
       const messaging = getMessaging();
       const result = await messaging.sendEachForMulticast({

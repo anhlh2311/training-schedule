@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { auth } from "../lib/firebase";
 
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID as string | undefined;
 
@@ -13,13 +14,43 @@ declare global {
         User?: {
           addEmail?: (email: string) => Promise<void>;
           PushSubscription?: {
-            addEventListener: (event: string, handler: (e: { current: { optedIn?: boolean }; previous: { optedIn?: boolean } }) => void) => void;
+            id?: string;
+            optedIn?: boolean;
+            addEventListener: (event: string, handler: (e: { current?: { optedIn?: boolean; id?: string }; previous?: { optedIn?: boolean; id?: string } }) => void) => void;
           };
         };
         Slidedown?: { promptPush: (opts?: { force?: boolean }) => void };
       }) => void
     >;
   }
+}
+
+async function registerPushSubscription(subscriptionId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  const token = await user.getIdToken();
+  await fetch("/api/register-push-subscription", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ subscriptionId }),
+  });
+}
+
+async function unregisterPushSubscription(subscriptionId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  const token = await user.getIdToken();
+  await fetch("/api/register-push-subscription", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ subscriptionId, optedIn: false }),
+  });
 }
 
 /**
@@ -79,15 +110,36 @@ export function useOneSignal(userId: string | null, enabled: boolean, email?: st
           listenerAdded.current = true;
           OneSignal.User.PushSubscription.addEventListener(
             "change",
-            (event: { current?: { optedIn?: boolean }; previous?: { optedIn?: boolean } }) => {
+            (event: {
+              current?: { optedIn?: boolean; id?: string };
+              previous?: { optedIn?: boolean; id?: string };
+            }) => {
               if (event?.current?.optedIn) {
                 const currentUid = uidRef.current;
                 if (currentUid) {
                   OneSignal.login(currentUid).catch(() => {});
                 }
+                const subId =
+                  event.current.id ??
+                  OneSignal.User?.PushSubscription?.id;
+                if (subId) {
+                  registerPushSubscription(subId).catch(() => {});
+                }
+              } else if (event?.current?.optedIn === false) {
+                const subId =
+                  event.current.id ?? event?.previous?.id;
+                if (subId) {
+                  unregisterPushSubscription(subId).catch(() => {});
+                }
               }
             }
           );
+        }
+
+        // Register current subscription if user already opted in (e.g. on page refresh).
+        const pushSub = OneSignal.User?.PushSubscription;
+        if (pushSub?.optedIn && pushSub?.id) {
+          registerPushSubscription(pushSub.id).catch(() => {});
         }
 
         // Manually trigger prompt if dashboard auto-prompt didn't show.

@@ -199,7 +199,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const onesignalAppId = process.env.ONESIGNAL_APP_ID;
     const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
     if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
-      const onesignalResult = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
+      const onesignalResult = await sendOneSignal(
+        db,
+        trainerUids,
+        userId,
+        onesignalAppId,
+        onesignalRestApiKey,
+        title,
+        messageBody
+      );
       const onesignalDebug: OneSignalDebug = {
         requestPayload: onesignalResult.requestPayload,
         response: onesignalResult.response,
@@ -308,23 +316,38 @@ interface OneSignalResult {
 }
 
 async function sendOneSignal(
+  db: Firestore,
+  trainerUids: string[],
+  excludeUserId: string,
   appId: string,
   restApiKey: string,
-  externalUserIds: string[],
   title: string,
   body: string
 ): Promise<OneSignalResult> {
-  // Use include_external_user_ids (legacy v1 API) - include_aliases can return "no recipients"
-  // even when users have enabled push subscriptions (known OneSignal API quirk).
+  const { getPushSubscriptionIdsFromDb } = await import("./lib/onesignal");
+  const subscriptionIds = await getPushSubscriptionIdsFromDb(
+    db,
+    trainerUids,
+    excludeUserId
+  );
+
+  if (subscriptionIds.length === 0) {
+    return {
+      sent: 0,
+      requestPayload: { app_id: appId, subscriptionIds: [] },
+      response: { status: 200, body: { recipients: 0 } },
+    };
+  }
+
   const requestPayload = {
     app_id: appId,
-    include_external_user_ids: externalUserIds,
+    include_subscription_ids: subscriptionIds,
     headings: { en: title },
     contents: { en: body },
     data: { url: "/" },
   };
 
-  const res = await fetch("https://onesignal.com/api/v1/notifications", {
+  const res = await fetch("https://api.onesignal.com/notifications", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -338,7 +361,7 @@ async function sendOneSignal(
   try {
     responseBody = text ? (JSON.parse(text) as unknown) : {};
   } catch {
-    responseBody = text || "(empty body)";
+    responseBody = text || {};
   }
 
   const result: OneSignalResult = {
