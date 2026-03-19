@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
+import { getPushSubscriptionIdsFromDb } from "./lib/onesignal";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -324,7 +325,6 @@ async function sendOneSignal(
   title: string,
   body: string
 ): Promise<OneSignalResult> {
-  const { getPushSubscriptionIdsFromDb } = await import("./lib/onesignal");
   const subscriptionIds = await getPushSubscriptionIdsFromDb(
     db,
     trainerUids,
