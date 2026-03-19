@@ -74,10 +74,12 @@ Trainers receive push notifications when availability changes or when someone su
 
 1. Create an app at [OneSignal](https://onesignal.com)
 2. Go to **Settings > Platforms > Web Push**
-3. Add your **Site URL** (e.g. `https://your-app.vercel.app`) — each domain (staging, production) must be added
-4. Upload your icon (e.g. `/IHN.png`)
+3. Set **Site URL** to your app origin (e.g. `https://your-app.vercel.app`) — use a **separate OneSignal app** per origin (staging vs production)
+4. Set **Default Icon URL** to a self-hosted image (e.g. `https://your-app.vercel.app/IHN.png`) to avoid CORS errors
 5. Configure welcome notification in the OneSignal dashboard (optional)
 6. Set `VITE_ONESIGNAL_APP_ID`, `ONESIGNAL_APP_ID`, and `ONESIGNAL_REST_API_KEY` in your environment
+
+For staging CORS, timeouts, or other console errors, see [docs/ONESIGNAL_TROUBLESHOOTING.md](docs/ONESIGNAL_TROUBLESHOOTING.md).
 
 ### How It Works
 
