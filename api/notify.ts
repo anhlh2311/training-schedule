@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
-import { getPushSubscriptionIdsFromDb } from "./lib/onesignal";
+import { getPushSubscriptionIdsFromDb } from "../lib/onesignal";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined

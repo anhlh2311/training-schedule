@@ -4,7 +4,7 @@ import admin from "firebase-admin";
 import {
   getPushSubscriptionIdsFromDb,
   sendOneSignalPush,
-} from "../lib/onesignal";
+} from "../../lib/onesignal";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
