@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { auth } from "../lib/firebase";
+import { postJsonWithAuth } from "../lib/fetchWithAuth";
 
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID as string | undefined;
+const REGISTER_SUBSCRIPTION_ENDPOINT = "/api/register-push-subscription";
 
 declare global {
   interface Window {
@@ -26,30 +28,15 @@ declare global {
 }
 
 async function registerPushSubscription(subscriptionId: string): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) return;
-  const token = await user.getIdToken();
-  await fetch("/api/register-push-subscription", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ subscriptionId }),
-  });
+  if (!auth.currentUser) return;
+  await postJsonWithAuth(REGISTER_SUBSCRIPTION_ENDPOINT, { subscriptionId });
 }
 
 async function unregisterPushSubscription(subscriptionId: string): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) return;
-  const token = await user.getIdToken();
-  await fetch("/api/register-push-subscription", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ subscriptionId, optedIn: false }),
+  if (!auth.currentUser) return;
+  await postJsonWithAuth(REGISTER_SUBSCRIPTION_ENDPOINT, {
+    subscriptionId,
+    optedIn: false,
   });
 }
 
@@ -64,9 +51,10 @@ export function useOneSignal(userId: string | null, enabled: boolean, email?: st
   const uidRef = useRef<string | null>(null);
   const listenerAdded = useRef(false);
   const prevUserId = useRef<string | null>(null);
-  uidRef.current = userId ?? null;
 
   useEffect(() => {
+    uidRef.current = userId ?? null;
+
     if (prevUserId.current && !userId && window.OneSignalDeferred) {
       prevUserId.current = null;
       window.OneSignalDeferred.push(async (OneSignal) => {

@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 
 /** Firestore `in` query supports max 30 values. */
 const ONESIGNAL_FIRESTORE_IN_LIMIT = 30;
+const ONESIGNAL_NOTIFICATIONS_ENDPOINT = "https://api.onesignal.com/notifications";
 
 /** Exported for `process-batch`; lives here so Vercel bundles it with `/api/notify`. */
 export async function getPushSubscriptionIdsFromDb(
@@ -48,7 +49,7 @@ async function fetchOneSignal(
   restApiKey: string,
   payload: object
 ): Promise<{ ok: boolean; status: number; body: unknown }> {
-  const res = await fetch("https://api.onesignal.com/notifications", {
+  const res = await fetch(ONESIGNAL_NOTIFICATIONS_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

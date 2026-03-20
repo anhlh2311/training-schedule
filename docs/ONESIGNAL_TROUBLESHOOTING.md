@@ -22,24 +22,34 @@ has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is pres
 
 ---
 
-## 2. OneSignal Network Timeout
+## 2. OneSignal Network Timeout (`users/by/onesignal_id`)
 
 ```
 OneSignal: Network timed out while calling https://api.onesignal.com/apps/.../users/by/onesignal_id/...
 ```
 
-**Cause:** The OneSignal client SDK cannot reach `api.onesignal.com`. Common reasons:
+**What it is:** This request is made **inside the OneSignal Web SDK** (often from `OneSignalSDK.sw.js`), not by your app code or `/api/notify`. The SDK syncs user state by calling OneSignal’s REST API to load a user by `onesignal_id`. Our backend uses Firestore **subscription IDs** for sends; we do **not** call this endpoint from the server.
 
-- **Site URL mismatch:** OneSignal only allows one origin per app. Staging must use a separate OneSignal app.
-- **Firewall/proxy:** Corporate networks or VPNs may block OneSignal.
-- **Browser extensions:** Ad blockers or privacy extensions may block OneSignal.
+**Cause:** The browser (or service worker) cannot complete `api.onesignal.com` requests in time. Common reasons:
 
-**Fix for staging:**
+- **Site URL mismatch:** OneSignal only allows one origin per app. Staging must use a **separate** OneSignal app with **Site URL** exactly matching your origin.
+- **Network:** Slow or blocked path to `api.onesignal.com` (firewall, VPN, corporate proxy, DNS, ISP).
+- **Extensions:** Ad blockers or privacy tools blocking OneSignal.
+- **OneSignal:** Temporary slowness or outage (check [status.onesignal.com](https://status.onesignal.com) if available).
 
-1. Create a **separate OneSignal app** for staging (OneSignal does not support multiple origins in one app)
-2. In the staging app: **Settings** → **Platforms** → **Web Push** → **Site URL** = `https://ihn-schedule-stg.tungtang.vn` (exact match)
-3. Set `VITE_ONESIGNAL_APP_ID`, `ONESIGNAL_APP_ID`, and `ONESIGNAL_REST_API_KEY` in Vercel staging env to the **staging** app's values
-4. Test without VPN or ad blockers
+**What you can do:**
+
+1. **Confirm the OneSignal app matches your origin** (see checklist below).
+2. **Test** in a clean browser profile (no extensions), **disable VPN**, try another network.
+3. **From the machine** run `curl -I https://api.onesignal.com` — if it hangs or fails, the issue is network/DNS, not the app.
+4. If timeouts persist but push still works, the console noise is often **benign**; the SDK retries. If push never works, fix Site URL / network first.
+
+**Staging checklist:**
+
+1. Create a **separate OneSignal app** for staging (OneSignal does not support multiple origins in one app).
+2. In the staging app: **Settings** → **Platforms** → **Web Push** → **Site URL** = your exact origin (e.g. `https://ihn-schedule-stg.tungtang.vn`).
+3. Set `VITE_ONESIGNAL_APP_ID`, `ONESIGNAL_APP_ID`, and `ONESIGNAL_REST_API_KEY` in Vercel staging env to the **staging** app’s values.
+4. Test without VPN or ad blockers.
 
 ---
 
