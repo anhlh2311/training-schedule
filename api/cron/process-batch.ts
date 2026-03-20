@@ -3,8 +3,8 @@ import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
 import {
   getPushSubscriptionIdsFromDb,
-  sendOneSignalPush,
-} from "../../lib/onesignal";
+  sendOneSignalNotification,
+} from "../notify";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -97,12 +97,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? "1 update from a trainer."
         : `${count} availability/event updates.`;
     if (useOneSignal) {
-      const result = await sendOneSignalPush(
+      const result = await sendOneSignalNotification(
         onesignalAppId!,
         onesignalRestApiKey!,
-        subscriptionIds,
         title,
-        body
+        body,
+        { subscriptionIds }
       );
       sent += result.sent;
       if (result.error) {
