@@ -92,13 +92,28 @@ export async function sendOneSignalNotification(
     };
   }
 
-  const requestPayload = {
+  // OneSignal: `JSON.stringify` drops `undefined` — if `en` is missing, body can be empty on device.
+  // Use `default` + `en` so subscriptions with non-English language still match a message variant.
+  const heading = (title || "Training Schedule").trim() || "Training Schedule";
+  const bodyText =
+    (messageBody != null && String(messageBody).trim()) || heading;
+  const localized = { en: bodyText, default: bodyText };
+  const localizedHeadings = { en: heading, default: heading };
+
+  const requestPayload: Record<string, unknown> = {
     app_id: appId,
     include_subscription_ids: subscriptionIds,
-    headings: { en: title },
-    contents: { en: messageBody },
+    headings: localizedHeadings,
+    contents: localized,
     data: { url: "/" },
   };
+
+  const siteUrl =
+    process.env.APP_ORIGIN ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+  if (siteUrl) {
+    requestPayload.url = siteUrl;
+  }
   const { ok, status, body: responseBody } = await fetchOneSignal(
     restApiKey,
     requestPayload

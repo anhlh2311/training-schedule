@@ -65,6 +65,7 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to include debug info (payloadSummary, OneSignal request/response) in `/api/notify` responses. Useful for staging. |
 | `VITE_NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to show a log panel at the bottom of the page with notify API responses. Use with `NOTIFY_DEBUG`. |
 | `CRON_SECRET` | (Optional) Secret for securing `/api/cron/process-batch` if not using Vercel Cron |
+| `APP_ORIGIN` | (Optional) Full public URL (`https://your-domain.com`) for OneSignal notification `url` (tap target). On Vercel, `VERCEL_URL` is used if unset. |
 
 ## Push Notifications (OneSignal)
 

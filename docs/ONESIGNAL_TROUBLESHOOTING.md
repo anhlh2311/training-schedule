@@ -111,6 +111,33 @@ SES Removing unpermitted intrinsics
 
 ---
 
+## 7. Notification shows title only (no body), even with curl
+
+**Symptom:** The OS shows a title (or app name) and source/domain, but **no message line** — including when you send with `curl` and explicit `headings` / `contents`.
+
+**Implication:** The problem is **not** in app code that builds the payload (e.g. empty `contents` from `undefined`). The REST request already contains a body; something else controls what the OS renders.
+
+**Checklist:**
+
+1. **Use the current API host** (same as [api/notify.ts](mdc:api/notify.ts)):
+   - Prefer: `POST https://api.onesignal.com/notifications`
+   - Older `https://onesignal.com/api/v1/notifications` may still work but align with [OneSignal’s docs](https://documentation.onesignal.com/reference/create-notification) when debugging.
+
+2. **Confirm in OneSignal Dashboard**  
+   Open **Messages** → select the delivery → verify the message **content** and **per-channel** preview. If the dashboard shows the full body but the device does not, the issue is **client/OS/display**, not the JSON you sent.
+
+3. **Platform behavior**
+   - **iOS (web / PWA):** Notification center layout and “Show Previews” / Focus settings can change how much text is visible; test the **same** payload on **Chrome desktop** (Windows/macOS) to see if the body appears there.
+   - **Android:** Ensure the site’s notification channel is not set to **minimize** or hide sensitive content (system **Settings → Apps → Chrome → Notifications**).
+
+4. **Dashboard overrides**  
+   Check **Templates**, **Journeys**, or **A/B** tests that might override content for web.
+
+5. **API key exposure**  
+   If a REST API key was pasted into chat or committed to a repo, **rotate it** in OneSignal (**Settings → Keys & IDs**) and update Vercel env vars.
+
+---
+
 ## Checklist for Staging
 
 - [ ] Separate OneSignal app for staging with Site URL = staging origin
