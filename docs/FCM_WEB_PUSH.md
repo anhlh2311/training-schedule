@@ -16,7 +16,11 @@ Web push on iPhone/iPad requires:
 - A valid **web app manifest** (see [api/manifest.ts](mdc:api/manifest.ts))
 - Notification permission granted by the user
 
-The [AddToHomeScreenPrompt](mdc:src/components/AddToHomeScreenPrompt.tsx) component guides trainers on iOS.
+**Permission prompt:** On iOS, `Notification.requestPermission()` is only reliable when triggered by a **user gesture** (e.g. a button tap). Automatic calls from `useEffect` often do not show the system dialog. The app uses [IosPushPermissionBanner](mdc:src/components/IosPushPermissionBanner.tsx) for trainers on iOS in standalone mode; [useFcmToken.ts](mdc:src/hooks/useFcmToken.ts) then registers the FCM token after permission is `granted`.
+
+**Not OneSignal tokens:** A “Safari Push” subscription in OneSignal is that vendor’s channel to Apple’s push endpoint. **FCM uses its own registration token** from the Firebase SDK (`getToken`); you cannot paste OneSignal subscription IDs or Safari push URLs into FCM. After migrating to FCM, tokens live only under `users/{uid}/fcmTokens` from this app.
+
+The [AddToHomeScreenPrompt](mdc:src/components/AddToHomeScreenPrompt.tsx) component guides trainers when the site is still opened in Safari instead of the installed PWA.
 
 References:
 

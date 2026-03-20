@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
+import IosPushPermissionBanner from "./IosPushPermissionBanner";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
 import NotifyDebugLog from "./NotifyDebugLog";
@@ -323,7 +324,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </nav>
 
-      {isTrainer && <AddToHomeScreenPrompt />}
+      {isTrainer && (
+        <>
+          <AddToHomeScreenPrompt />
+          <IosPushPermissionBanner />
+        </>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
