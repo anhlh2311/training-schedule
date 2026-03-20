@@ -1,10 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
-import {
-  getPushSubscriptionIdsFromDb,
-  sendOneSignalNotification,
-} from "../notify";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -13,15 +9,15 @@ function getFirebaseAdmin() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
-  
+
   if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
-  
+
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
   }
-  
+
   return admin.initializeApp({
     credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   });
@@ -79,13 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const trainerUids = await getTrainerUids(db);
-  const onesignalAppId = process.env.ONESIGNAL_APP_ID;
-  const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
-  const useOneSignal = Boolean(onesignalAppId && onesignalRestApiKey && trainerUids.length > 0);
-  const fcmTokens = useOneSignal ? [] : await getFcmTokensForUsers(db, trainerUids);
-  const subscriptionIds = useOneSignal
-    ? await getPushSubscriptionIdsFromDb(db, trainerUids)
-    : [];
+  const fcmTokens = await getFcmTokensForUsers(db, trainerUids);
   const batch = db.batch();
   let sent = 0;
 
@@ -96,19 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       count === 1
         ? "1 update from a trainer."
         : `${count} availability/event updates.`;
-    if (useOneSignal) {
-      const result = await sendOneSignalNotification(
-        onesignalAppId!,
-        onesignalRestApiKey!,
-        title,
-        body,
-        { subscriptionIds }
-      );
-      sent += result.sent;
-      if (result.error) {
-        console.error("[process-batch] OneSignal:", result.error);
-      }
-    } else if (fcmTokens.length > 0) {
+    if (fcmTokens.length > 0) {
       const messaging = getMessaging();
       const result = await messaging.sendEachForMulticast({
         notification: { title, body },

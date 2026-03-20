@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
-import { useOneSignal } from "../hooks/useOneSignal";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
@@ -19,7 +18,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, appUser, isTrainer, isMember, isAdmin, signOut, updateDisplayName } = useAuth();
   const location = useLocation();
 
-  useOneSignal(user?.uid ?? null, isTrainer, user?.email ?? null);
   useFcmToken(user?.uid ?? null, isTrainer);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

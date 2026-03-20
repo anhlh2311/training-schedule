@@ -7,9 +7,9 @@ A React app for teams to register and view training availability on a shared cal
 - React 19 + TypeScript + Vite
 - Tailwind CSS v4
 - Firebase Auth (Google) + Firestore
+- Firebase Cloud Messaging (FCM) for web push notifications
 - react-big-calendar + dayjs
 - React Router v7
-- OneSignal Web SDK v16 (push notifications)
 
 ## Prerequisites
 
@@ -22,7 +22,8 @@ A React app for teams to register and view training availability on a shared cal
 2. Navigate to **Authentication > Sign-in method** and enable **Google**
 3. Navigate to **Firestore Database** and create a database (start in **test mode** for development)
 4. Go to **Project settings > General** and copy your web app config
-5. Deploy security rules: run `firebase deploy --only firestore:rules` (requires `firebase init` if not set up), or paste [firestore.rules](firestore.rules) into Firebase Console > Firestore > Rules
+5. For push: **Project settings > Cloud Messaging > Web Push certificates** — generate a key pair and copy the **public** key into `VITE_FIREBASE_VAPID_PUBLIC_KEY`
+6. Deploy security rules: run `firebase deploy --only firestore:rules` (requires `firebase init` if not set up), or paste [firestore.rules](firestore.rules) into Firebase Console > Firestore > Rules
 
 ## Getting Started
 
@@ -49,48 +50,36 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase app ID |
-| `VITE_FIREBASE_VAPID_PUBLIC_KEY` | (Optional) Web Push VAPID key for FCM fallback. From Firebase Console > Project settings > Cloud Messaging > Web Push certificates |
-| `VITE_ONESIGNAL_APP_ID` | **Required for push notifications.** OneSignal App ID. From [OneSignal](https://onesignal.com) > Settings > Keys & IDs. Injected at build time into [index.html](index.html). |
+| `VITE_FIREBASE_VAPID_PUBLIC_KEY` | **Required for push notifications.** Web Push VAPID key from Firebase Console > Project settings > Cloud Messaging > Web Push certificates |
 | `VITE_APP_URL` | Base URL of the deployed app (e.g. `https://your-app.vercel.app`) |
 
-**For Vercel API (trainer notifications):** set these in Vercel project settings so `/api/notify` and the cron can use Firebase Admin and OneSignal:
+**For Vercel API (trainer notifications):** set these in Vercel project settings so `/api/notify` and the cron can use Firebase Admin and FCM:
 
 | Variable | Description |
 |---|---|
 | `FIREBASE_PROJECT_ID` | Same as `VITE_FIREBASE_PROJECT_ID` |
 | `FIREBASE_CLIENT_EMAIL` | Service account client email (JSON key) |
 | `FIREBASE_PRIVATE_KEY` | Service account private key (JSON key; keep newlines or use `\n`) |
-| `ONESIGNAL_APP_ID` | OneSignal App ID. Must match `VITE_ONESIGNAL_APP_ID`. |
-| `ONESIGNAL_REST_API_KEY` | OneSignal REST API key (Settings > Keys & IDs). Required for sending push notifications. |
-| `NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to include debug info (payloadSummary, OneSignal request/response) in `/api/notify` responses. Useful for staging. |
+| `NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to include debug info (payloadSummary, FCM counts) in `/api/notify` responses. Useful for staging. |
 | `VITE_NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to show a log panel at the bottom of the page with notify API responses. Use with `NOTIFY_DEBUG`. |
 | `CRON_SECRET` | (Optional) Secret for securing `/api/cron/process-batch` if not using Vercel Cron |
-| `APP_ORIGIN` | (Optional) Full public URL (`https://your-domain.com`) for OneSignal notification `url` (tap target). On Vercel, `VERCEL_URL` is used if unset. |
 
-## Push Notifications (OneSignal)
+## Push Notifications (FCM)
 
-Trainers receive push notifications when availability changes or when someone subscribes/drops off an event. The app uses **OneSignal** for web push (better iOS support than FCM).
+Trainers receive push notifications when availability changes or when someone subscribes/drops off an event. The app uses **Firebase Cloud Messaging** for web push (service worker + VAPID).
 
-### OneSignal Setup
+### Setup
 
-1. Create an app at [OneSignal](https://onesignal.com)
-2. Go to **Settings > Platforms > Web Push**
-3. Set **Site URL** to your app origin (e.g. `https://your-app.vercel.app`) — use a **separate OneSignal app** per origin (staging vs production)
-4. Set **Default Icon URL** to a self-hosted image (e.g. `https://your-app.vercel.app/IHN.png`) to avoid CORS errors
-5. Configure welcome notification in the OneSignal dashboard (optional)
-6. Set `VITE_ONESIGNAL_APP_ID`, `ONESIGNAL_APP_ID`, and `ONESIGNAL_REST_API_KEY` in your environment
+1. Enable **Cloud Messaging** in Firebase and add **Web Push certificates** (VAPID) in Project settings
+2. Set `VITE_FIREBASE_VAPID_PUBLIC_KEY` in the client env; build generates [public/firebase-messaging-sw.js](public/firebase-messaging-sw.js) from `scripts/generate-firebase-sw.cjs`
+3. Server routes [api/notify.ts](api/notify.ts) and [api/cron/process-batch.ts](api/cron/process-batch.ts) send via `firebase-admin` to FCM registration tokens stored under `users/{uid}/fcmTokens/*`
 
-For staging CORS, timeouts, or other console errors, see [docs/ONESIGNAL_TROUBLESHOOTING.md](docs/ONESIGNAL_TROUBLESHOOTING.md).
+See [docs/FCM_WEB_PUSH.md](docs/FCM_WEB_PUSH.md) for iOS PWA requirements and references.
 
-### How It Works
+### How it works
 
-- **Client:** OneSignal SDK loads in [index.html](index.html) and initializes early so the permission prompt appears on first visit. The [useOneSignal](src/hooks/useOneSignal.ts) hook links the subscription to the user's Firebase UID (`external_id`) when a trainer logs in.
-- **Server:** [api/notify.ts](api/notify.ts) receives events from the app and sends via OneSignal REST API. Notifications include event title, time, and drop-off reason.
-- **iOS:** Add the app to the home screen (PWA) for push to work. An in-app banner guides iOS trainers.
-
-### Fallback
-
-If OneSignal env vars are not set, the app logs a console error and push is disabled. FCM remains available as a fallback when `VITE_FIREBASE_VAPID_PUBLIC_KEY` is set, but OneSignal is recommended.
+- **Client:** [useFcmToken](src/hooks/useFcmToken.ts) registers the FCM token when a trainer is signed in and stores it in Firestore
+- **Server:** [api/notify.ts](api/notify.ts) sends `notification` + `data` payloads to all trainer tokens (excluding the actor)
 
 ## Trainer Notifications
 
@@ -102,23 +91,22 @@ Admins can enable **notification aggregation** under **Settings** so updates are
 
 1. Push the repo to GitHub
 2. Import the project on [Vercel](https://vercel.com)
-3. Add all `VITE_FIREBASE_*` and `VITE_ONESIGNAL_APP_ID` environment variables in the Vercel project settings
-4. Add server vars: `FIREBASE_*`, `ONESIGNAL_APP_ID`, `ONESIGNAL_REST_API_KEY`
+3. Add all `VITE_FIREBASE_*` environment variables (including `VITE_FIREBASE_VAPID_PUBLIC_KEY`) in the Vercel project settings
+4. Add server vars: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 5. Deploy
 
-For staging/production, use separate OneSignal apps or add each domain to the OneSignal Site URL settings. The `Cross-Origin-Opener-Policy: same-origin-allow-popups` header is set in [vercel.json](vercel.json) for Firebase Auth popup compatibility.
+The `Cross-Origin-Opener-Policy: same-origin-allow-popups` header is set in [vercel.json](vercel.json) for Firebase Auth popup compatibility.
 
 ## Project Structure
 
 ```text
 api/
-  notify.ts              Vercel serverless: receives events, sends OneSignal
+  notify.ts              Vercel serverless: receives events, sends FCM
   manifest.ts            PWA manifest endpoint
   cron/
     process-batch.ts     Batched notification delivery
 public/
-  OneSignalSDKWorker.js  OneSignal service worker (imports CDN script)
-  firebase-messaging-sw.js  FCM fallback (generated from env)
+  firebase-messaging-sw.js  FCM service worker (generated from env at build)
 src/
   components/
     AddToHomeScreenPrompt.tsx  iOS PWA install banner
@@ -128,8 +116,7 @@ src/
   context/
     AuthContext.tsx            Auth state provider
   hooks/
-    useOneSignal.ts            Links OneSignal subscription to Firebase UID
-    useFcmToken.ts             FCM token registration (fallback)
+    useFcmToken.ts             FCM token registration for trainers
   lib/
     firebase.ts                 Firebase initialization
     notifyTrainers.ts           Client API for triggering notifications

@@ -2,136 +2,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
 
-/** Firestore `in` query supports max 30 values. */
-const ONESIGNAL_FIRESTORE_IN_LIMIT = 30;
-const ONESIGNAL_NOTIFICATIONS_ENDPOINT = "https://api.onesignal.com/notifications";
-
-/** Exported for `process-batch`; lives here so Vercel bundles it with `/api/notify`. */
-export async function getPushSubscriptionIdsFromDb(
-  db: Firestore,
-  trainerUids: string[],
-  excludeUserId?: string
-): Promise<string[]> {
-  if (trainerUids.length === 0) return [];
-
-  const ids: string[] = [];
-  for (let i = 0; i < trainerUids.length; i += ONESIGNAL_FIRESTORE_IN_LIMIT) {
-    const batch = trainerUids.slice(i, i + ONESIGNAL_FIRESTORE_IN_LIMIT);
-    const snap = await db
-      .collection("oneSignalSubscriptions")
-      .where("userId", "in", batch)
-      .get();
-
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const userId = data.userId as string | undefined;
-      if (userId && userId !== excludeUserId) {
-        ids.push(doc.id);
-      }
-    }
-  }
-  return ids;
-}
-
-export interface OneSignalSendResult {
-  sent: number;
-  error?: string;
-  requestPayload: object;
-  response: { status: number; body: unknown };
-}
-
-/** Either pass IDs (e.g. cron) or resolve them from Firestore (e.g. `/api/notify`). */
-export type OneSignalSubscriptionSource =
-  | { subscriptionIds: string[] }
-  | { db: Firestore; trainerUids: string[]; excludeUserId?: string };
-
-async function fetchOneSignal(
-  restApiKey: string,
-  payload: object
-): Promise<{ ok: boolean; status: number; body: unknown }> {
-  const res = await fetch(ONESIGNAL_NOTIFICATIONS_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Key ${restApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  const text = await res.text();
-  let body: unknown;
-  try {
-    body = text ? (JSON.parse(text) as unknown) : {};
-  } catch {
-    body = text || {};
-  }
-  return { ok: res.ok, status: res.status, body };
-}
-
-/** Send via OneSignal REST API: shared payload build + `fetchOneSignal`. */
-export async function sendOneSignalNotification(
-  appId: string,
-  restApiKey: string,
-  title: string,
-  messageBody: string,
-  source: OneSignalSubscriptionSource
-): Promise<OneSignalSendResult> {
-  const subscriptionIds =
-    "subscriptionIds" in source
-      ? source.subscriptionIds
-      : await getPushSubscriptionIdsFromDb(
-          source.db,
-          source.trainerUids,
-          source.excludeUserId
-        );
-
-  if (subscriptionIds.length === 0) {
-    return {
-      sent: 0,
-      requestPayload: { app_id: appId, subscriptionIds: [] },
-      response: { status: 200, body: { recipients: 0 } },
-    };
-  }
-
-  // OneSignal: `JSON.stringify` drops `undefined` — if `en` is missing, body can be empty on device.
-  // Use `default` + `en` so subscriptions with non-English language still match a message variant.
-  const heading = (title || "Training Schedule").trim() || "Training Schedule";
-  const bodyText =
-    (messageBody != null && String(messageBody).trim()) || heading;
-  const localized = { en: bodyText, default: bodyText };
-  const localizedHeadings = { en: heading, default: heading };
-
-  const requestPayload: Record<string, unknown> = {
-    app_id: appId,
-    include_subscription_ids: subscriptionIds,
-    headings: localizedHeadings,
-    contents: localized,
-    data: { url: "/" },
-  };
-
-  const siteUrl =
-    process.env.APP_ORIGIN ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
-  if (siteUrl) {
-    requestPayload.url = siteUrl;
-  }
-  const { ok, status, body: responseBody } = await fetchOneSignal(
-    restApiKey,
-    requestPayload
-  );
-
-  const result: OneSignalSendResult = {
-    sent: ok ? ((responseBody as { recipients?: number }).recipients ?? 0) : 0,
-    requestPayload,
-    response: { status, body: responseBody },
-  };
-
-  if (!ok) {
-    result.error = `OneSignal API ${status}: ${JSON.stringify(responseBody)}`;
-  }
-
-  return result;
-}
-
 function getFirebaseAdmin() {
   // guard in case apps is undefined
   if (Array.isArray(admin.apps) && admin.apps.length > 0) return admin.app();
@@ -139,15 +9,15 @@ function getFirebaseAdmin() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
-  
+
   if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
-  
+
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
   }
-  
+
   return admin.initializeApp({
     credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   });
@@ -165,7 +35,7 @@ function getMessaging() {
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-/** When true, include debug info (payloadSummary, formatted, onesignal request/response) in API responses. */
+/** When true, include debug info (payloadSummary, formatted, FCM counts) in API responses. */
 const NOTIFY_DEBUG =
   process.env.NOTIFY_DEBUG === "true" || process.env.NOTIFY_DEBUG === "1";
 
@@ -213,32 +83,14 @@ function safeJson(res: VercelResponse, status: number, body: object): void {
   }
 }
 
-interface OneSignalDebug {
-  requestPayload: object;
-  response: { status: number; body: unknown };
-}
-
 function buildDebugInfo(
   body: NotifyBody,
   type: NotifyType,
   senderId: string,
   trainerUids: string[],
-  formatted: { title: string; body: string },
-  onesignal?: OneSignalDebug
+  formatted: { title: string; body: string }
 ) {
-  const d: {
-    type: NotifyType;
-    payloadSummary: {
-      senderId: string;
-      trainerUids: string[];
-      eventTitle?: string;
-      eventStartTime?: string;
-      eventStartTimeFormatted?: string;
-      dropOffReason?: string;
-    };
-    formatted: { title: string; body: string };
-    onesignal?: OneSignalDebug;
-  } = {
+  return {
     type,
     payloadSummary: {
       senderId,
@@ -250,8 +102,6 @@ function buildDebugInfo(
     },
     formatted: { title: formatted.title, body: formatted.body },
   };
-  if (onesignal) d.onesignal = onesignal;
-  return d;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -328,46 +178,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const formatted = formatMessage(type, userName ?? "A trainer", body);
     const { title, body: messageBody } = formatted;
 
-    const onesignalAppId = process.env.ONESIGNAL_APP_ID;
-    const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
-    if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
-      const onesignalResult = await sendOneSignalNotification(
-        onesignalAppId,
-        onesignalRestApiKey,
-        title,
-        messageBody,
-        { db, trainerUids, excludeUserId: userId }
-      );
-      const osDbg: OneSignalDebug = {
-        requestPayload: onesignalResult.requestPayload,
-        response: onesignalResult.response,
-      };
-      const dbg = () =>
-        Object.assign(buildDebugInfo(body, type, userId, trainerUids, formatted, osDbg), {
-          trainerCount: trainerUids.length,
-        });
-      if (onesignalResult.error) {
-        console.error("[api/notify] OneSignal error:", onesignalResult.error);
-        const errorResponse: { error: string; detail: string; debug?: object } = {
-          error: "OneSignal notification failed",
-          detail: onesignalResult.error,
-        };
-        if (NOTIFY_DEBUG) errorResponse.debug = dbg();
-        safeJson(res, 500, errorResponse);
-        return;
-      }
-      const successResponse: { sent: number; provider: string; debug?: object } = {
-        sent: onesignalResult.sent,
-        provider: "onesignal",
-      };
-      if (NOTIFY_DEBUG) successResponse.debug = dbg();
-      safeJson(res, 200, successResponse);
-      return;
-    }
-
     const tokens = await getFcmTokensForUsers(db, trainerUids);
     if (tokens.length === 0) {
-      const response: { sent: number; debug?: object } = { sent: 0 };
+      const response: { sent: number; provider: string; debug?: object } = {
+        sent: 0,
+        provider: "fcm",
+      };
       if (NOTIFY_DEBUG) {
         response.debug = Object.assign(
           buildDebugInfo(body, type, userId, trainerUids, formatted),
@@ -385,9 +201,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);
-    const fcmResponse: { sent: number; failed?: number; debug?: object } = {
+    const fcmResponse: {
+      sent: number;
+      failed?: number;
+      provider: string;
+      debug?: object;
+    } = {
       sent: result.successCount,
       failed: result.failureCount,
+      provider: "fcm",
     };
     if (NOTIFY_DEBUG) {
       fcmResponse.debug = Object.assign(

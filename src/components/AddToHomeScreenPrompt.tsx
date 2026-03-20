@@ -28,7 +28,7 @@ function isStandalone(): boolean {
 /**
  * Shows a dismissible banner on iOS when the app is not opened from the home screen.
  * Explains that adding to home screen is required for push notifications on iPhone/iPad.
- * Shown to trainers regardless of push provider (OneSignal/FCM) so iOS users can install the PWA.
+ * Shown to trainers so iOS users can install the PWA (required for FCM web push on iPhone/iPad).
  */
 export default function AddToHomeScreenPrompt() {
   const [visible, setVisible] = useState(false);

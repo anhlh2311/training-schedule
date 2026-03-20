@@ -11,11 +11,6 @@
   "rewrites": [
     { "source": "/manifest.json", "destination": "/manifest.json" },
     { "source": "/IHN.png", "destination": "/IHN.png" },
-    { "source": "/OneSignalSDKWorker.js", "destination": "/OneSignalSDKWorker.js" },
-    {
-      "source": "/OneSignalSDK.sw.js",
-      "destination": "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js"
-    },
     { "source": "/firebase-messaging-sw.js", "destination": "/firebase-messaging-sw.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
