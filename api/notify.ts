@@ -1,10 +1,68 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
-import {
-  getFcmTokenEntries,
-  removeDeadFcmTokensAfterSend,
-} from "../server/fcmTokens";
+
+/** Shared with [api/cron/process-batch.ts](api/cron/process-batch.ts) — keep in this file so Vercel bundles it (no extra `server/` path on disk). */
+export interface FcmTokenEntry {
+  token: string;
+  path: string;
+}
+
+export async function getFcmTokenEntries(
+  db: Firestore,
+  uids: string[]
+): Promise<FcmTokenEntry[]> {
+  const entries: FcmTokenEntry[] = [];
+  for (const uid of uids) {
+    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
+    for (const d of snap.docs) {
+      const t = d.data().token;
+      if (typeof t === "string" && t.trim().length > 0) {
+        entries.push({ token: t, path: d.ref.path });
+      }
+    }
+  }
+  return entries;
+}
+
+const FCM_PRUNE_ERROR_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+  "messaging/invalid-argument",
+]);
+
+export async function removeDeadFcmTokensAfterSend(
+  db: Firestore,
+  entries: FcmTokenEntry[],
+  responses: Array<{ success: boolean; error?: { code?: string } }>
+): Promise<number> {
+  const paths: string[] = [];
+  for (let i = 0; i < responses.length; i++) {
+    const r = responses[i];
+    if (r.success) continue;
+    const code = r.error?.code;
+    if (!code || !FCM_PRUNE_ERROR_CODES.has(code)) continue;
+    const path = entries[i]?.path;
+    if (path) paths.push(path);
+  }
+  if (paths.length === 0) return 0;
+
+  let batch = db.batch();
+  let ops = 0;
+  let total = 0;
+  for (const path of paths) {
+    batch.delete(db.doc(path));
+    ops++;
+    total++;
+    if (ops >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+  if (ops > 0) await batch.commit();
+  return total;
+}
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined

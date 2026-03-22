@@ -65,7 +65,7 @@ If **all** entries are `success: true` but the iPhone still shows nothing, the i
 | `messaging/invalid-argument` | Token string is not a valid FCM registration token (corrupt row, old test data, or truncated paste). |
 | *(success: true)* | FCM accepted the message; if the device still shows nothing, check **OS notification settings** and test with the app **backgrounded**. |
 
-The API removes Firestore `fcmTokens` docs that fail with the above codes (see [server/fcmTokens.ts](mdc:server/fcmTokens.ts)) so users re-register a fresh token on next visit. After deploy, **`fcmTokensPruned`** in `NOTIFY_DEBUG` shows how many stale docs were deleted.
+The API removes Firestore `fcmTokens` docs that fail with the above codes (logic lives in [api/notify.ts](mdc:api/notify.ts) and is imported by the cron handler) so users re-register a fresh token on next visit. After deploy, **`fcmTokensPruned`** in `NOTIFY_DEBUG` shows how many stale docs were deleted.
 
 ## Troubleshooting
 

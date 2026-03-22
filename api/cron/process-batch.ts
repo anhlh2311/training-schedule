@@ -4,7 +4,7 @@ import admin from "firebase-admin";
 import {
   getFcmTokenEntries,
   removeDeadFcmTokensAfterSend,
-} from "../../server/fcmTokens";
+} from "../notify";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
