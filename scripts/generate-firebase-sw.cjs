@@ -32,10 +32,16 @@ firebase.initializeApp(${JSON.stringify(config)});
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  const title = payload.notification?.title || payload.data?.title || "Training Schedule";
+  // Messages that include a \`notification\` payload are shown automatically by
+  // the browser/FCM when the app is in the background. Calling showNotification()
+  // here would show the same alert twice (duplicate notifications).
+  if (payload.notification) {
+    return;
+  }
+  const title = payload.data?.title || "Training Schedule";
   const options = {
-    body: payload.notification?.body || payload.data?.body || "",
-    icon: payload.notification?.icon || payload.data?.icon || "/IHN-Logo-1000x1000.png",
+    body: payload.data?.body || "",
+    icon: payload.data?.icon || "/IHN-Logo-1000x1000.png",
     tag: payload.data?.tag || "training-schedule",
     data: payload.data || {},
   };

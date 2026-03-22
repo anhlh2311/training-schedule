@@ -69,5 +69,6 @@ The API removes Firestore `fcmTokens` docs that fail with the above codes (logic
 
 ## Troubleshooting
 
+- **Duplicate notifications (same title/body twice):** The server sends FCM messages with a **`notification`** payload; the browser already displays those automatically in the background. The service worker must **not** call `showNotification()` again inside `onBackgroundMessage` for those messages — that was causing duplicates. [scripts/generate-firebase-sw.cjs](mdc:scripts/generate-firebase-sw.cjs) returns early when `payload.notification` is set; only **data-only** messages are shown manually.
 - **No token in Firestore:** Check `VITE_FIREBASE_VAPID_PUBLIC_KEY`, HTTPS, and that the browser supports FCM (`isSupported()` in [useFcmToken.ts](mdc:src/hooks/useFcmToken.ts)).
 - **No delivery:** Verify `firebase-messaging-sw.js` is served from the site root and that the service worker version matches the app (see [scripts/generate-firebase-sw.cjs](mdc:scripts/generate-firebase-sw.cjs)).
