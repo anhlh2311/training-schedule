@@ -10,7 +10,8 @@
   ],
   "rewrites": [
     { "source": "/manifest.json", "destination": "/manifest.json" },
-    { "source": "/IHN.png", "destination": "/IHN.png" },
+    { "source": "/IHN-Logo-1000x1000.png", "destination": "/IHN-Logo-1000x1000.png" },
+    { "source": "/IHN-Logo-2000x2000.svg", "destination": "/IHN-Logo-2000x2000.svg" },
     { "source": "/firebase-messaging-sw.js", "destination": "/firebase-messaging-sw.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

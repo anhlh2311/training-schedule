@@ -24,7 +24,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl sm:p-10">
         <div className="mb-8 text-center">
           <img
-            src="/IHN.png"
+            src="/IHN-Logo-2000x2000.svg"
             alt="IHN Logo"
             className="mx-auto h-24 w-24"
           />

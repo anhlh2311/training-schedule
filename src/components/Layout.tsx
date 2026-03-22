@@ -55,7 +55,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900">
-              <img src="/IHN.png" alt="IHN Logo" className="h-14 w-14" />
+              <img src="/IHN-Logo-2000x2000.svg" alt="IHN Logo" className="h-14 w-14" />
               <span className="hidden sm:inline">Training Schedule</span>
             </Link>
 

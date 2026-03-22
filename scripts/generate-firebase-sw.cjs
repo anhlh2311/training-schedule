@@ -35,7 +35,7 @@ messaging.onBackgroundMessage(function (payload) {
   const title = payload.notification?.title || payload.data?.title || "Training Schedule";
   const options = {
     body: payload.notification?.body || payload.data?.body || "",
-    icon: payload.notification?.icon || payload.data?.icon || "/IHN.png",
+    icon: payload.notification?.icon || payload.data?.icon || "/IHN-Logo-1000x1000.png",
     tag: payload.data?.tag || "training-schedule",
     data: payload.data || {},
   };
