@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
+import {
+  getFcmTokenEntries,
+  removeDeadFcmTokensAfterSend,
+} from "./lib/fcmTokens";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -178,7 +182,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const formatted = formatMessage(type, userName ?? "A trainer", body);
     const { title, body: messageBody } = formatted;
 
-    const tokens = await getFcmTokensForUsers(db, trainerUids);
+    const tokenEntries = await getFcmTokenEntries(db, trainerUids);
+    const tokens = tokenEntries.map((e) => e.token);
     if (tokens.length === 0) {
       const response: { sent: number; provider: string; debug?: object } = {
         sent: 0,
@@ -201,6 +206,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);
+    const pruned = await removeDeadFcmTokensAfterSend(db, tokenEntries, result.responses);
+    if (pruned > 0) {
+      console.info(`[api/notify] Removed ${pruned} dead fcmTokens document(s)`);
+    }
     const fcmResponse: {
       sent: number;
       failed?: number;
@@ -224,6 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           trainerCount: trainerUids.length,
           tokenCount: tokens.length,
+          fcmTokensPruned: pruned,
           fcmPerToken: perToken,
         }
       );
@@ -252,21 +262,6 @@ async function getTrainerUids(
   return snap.docs
     .map((d) => d.id)
     .filter((id) => id !== excludeUid);
-}
-
-async function getFcmTokensForUsers(
-  db: Firestore,
-  uids: string[]
-): Promise<string[]> {
-  const tokens: string[] = [];
-  for (const uid of uids) {
-    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
-    for (const d of snap.docs) {
-      const t = d.data().token;
-      if (typeof t === "string") tokens.push(t);
-    }
-  }
-  return tokens;
 }
 
 function formatMessage(

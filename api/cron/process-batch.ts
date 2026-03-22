@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
+import {
+  getFcmTokenEntries,
+  removeDeadFcmTokensAfterSend,
+} from "../lib/fcmTokens";
 
 function getFirebaseAdmin() {
   // guard in case apps is undefined
@@ -75,7 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const trainerUids = await getTrainerUids(db);
-  const fcmTokens = await getFcmTokensForUsers(db, trainerUids);
+  const tokenEntries = await getFcmTokenEntries(db, trainerUids);
+  const fcmTokens = tokenEntries.map((e) => e.token);
   const batch = db.batch();
   let sent = 0;
 
@@ -94,6 +99,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tokens: fcmTokens,
       });
       sent += result.successCount;
+      const pruned = await removeDeadFcmTokensAfterSend(db, tokenEntries, result.responses);
+      if (pruned > 0) {
+        console.info(`[process-batch] Removed ${pruned} dead fcmTokens document(s)`);
+      }
     }
     for (const id of entry.docIds) {
       batch.delete(db.collection("notificationQueue").doc(id));
@@ -112,17 +121,3 @@ async function getTrainerUids(db: Firestore): Promise<string[]> {
   return snap.docs.map((d) => d.id);
 }
 
-async function getFcmTokensForUsers(
-  db: Firestore,
-  uids: string[]
-): Promise<string[]> {
-  const tokens: string[] = [];
-  for (const uid of uids) {
-    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
-    for (const d of snap.docs) {
-      const t = d.data().token;
-      if (typeof t === "string") tokens.push(t);
-    }
-  }
-  return tokens;
-}

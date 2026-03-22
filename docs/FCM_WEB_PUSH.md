@@ -57,6 +57,16 @@ If **all** entries are `success: true` but the iPhone still shows nothing, the i
 
 - **Vercel** `VITE_*` Firebase keys and **`FIREBASE_PROJECT_ID`** for the API must belong to the **same** Firebase project as the **Web Push** VAPID key in the console.
 
+## Interpreting `fcmPerToken` errors
+
+| `error.code` | Meaning |
+|--------------|--------|
+| `messaging/registration-token-not-registered` | Token expired or revoked (reinstall, cleared site data, browser reset). **Not** an iOS-only bug. |
+| `messaging/invalid-argument` | Token string is not a valid FCM registration token (corrupt row, old test data, or truncated paste). |
+| *(success: true)* | FCM accepted the message; if the device still shows nothing, check **OS notification settings** and test with the app **backgrounded**. |
+
+The API removes Firestore `fcmTokens` docs that fail with the above codes (see [api/lib/fcmTokens.ts](mdc:api/lib/fcmTokens.ts)) so users re-register a fresh token on next visit. After deploy, **`fcmTokensPruned`** in `NOTIFY_DEBUG` shows how many stale docs were deleted.
+
 ## Troubleshooting
 
 - **No token in Firestore:** Check `VITE_FIREBASE_VAPID_PUBLIC_KEY`, HTTPS, and that the browser supports FCM (`isSupported()` in [useFcmToken.ts](mdc:src/hooks/useFcmToken.ts)).
