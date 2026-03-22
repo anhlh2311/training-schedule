@@ -212,9 +212,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       provider: "fcm",
     };
     if (NOTIFY_DEBUG) {
+      const perToken = result.responses.map((r, index) => ({
+        index,
+        success: r.success,
+        error: r.error
+          ? { code: r.error.code, message: r.error.message }
+          : undefined,
+      }));
       fcmResponse.debug = Object.assign(
         buildDebugInfo(body, type, userId, trainerUids, formatted),
-        { trainerCount: trainerUids.length, tokenCount: tokens.length }
+        {
+          trainerCount: trainerUids.length,
+          tokenCount: tokens.length,
+          fcmPerToken: perToken,
+        }
       );
     }
     safeJson(res, 200, fcmResponse);

@@ -27,6 +27,36 @@ References:
 - [Firebase — Get started with FCM on Web](https://firebase.google.com/docs/cloud-messaging/js/client)
 - [Apple — Sending web push notifications in web apps](https://developer.apple.com/documentation/usernotifications/sending-web-push-notifications-in-web-apps-and-browsers)
 
+## Verification checklist (Android works, iOS does not)
+
+Do these **in order** on staging (or locally with the API pointed at the same Firebase project).
+
+### 1. Confirm the iPhone registered a token
+
+1. Sign in on the **iPhone PWA** (opened from the **home screen icon**) as a trainer; tap **Enable notifications** if shown.
+2. In **Firebase Console** → **Firestore** → `users` → `{trainerUid}` → subcollection **`fcmTokens`**.
+3. You should see at least one document with a long **`token`** string. If **empty**, fix client/VAPID before testing sends.
+
+### 2. See whether FCM accepts each token (server)
+
+1. Set **`NOTIFY_DEBUG=true`** (or `1`) in **Vercel** env for the environment you test (and optionally **`VITE_NOTIFY_DEBUG=true`** so the in-app log panel shows the response).
+2. Trigger a notification (e.g. an action that calls `/api/notify` with a valid user token).
+3. Open the JSON response **`debug.fcmPerToken`**: each array entry is one FCM send attempt (`success`, or `error.code` / `error.message` if it failed).
+   - **`UNREGISTERED` / `NOT_FOUND`** → token stale: re-open the PWA, tap **Enable notifications** again, or delete old `fcmTokens` docs and re-register.
+   - **`messaging/invalid-argument`** → wrong project or bad token format; check Firebase web app config matches [scripts/generate-firebase-sw.cjs](mdc:scripts/generate-firebase-sw.cjs) / Vercel env.
+
+If **all** entries are `success: true` but the iPhone still shows nothing, the issue is likely **device/OS** (notifications off, Focus, or testing only while the PWA is **foreground** — try locking the phone or backgrounding the app).
+
+### 3. Device checks (iPhone)
+
+- **Settings → Notifications →** (your PWA name) → **Allow Notifications** on.
+- Test with the PWA **in the background** or phone **locked** (foreground behavior can differ from Android).
+- **iOS 16.4+**, app installed from **Safari → Add to Home Screen**.
+
+### 4. Same Firebase project everywhere
+
+- **Vercel** `VITE_*` Firebase keys and **`FIREBASE_PROJECT_ID`** for the API must belong to the **same** Firebase project as the **Web Push** VAPID key in the console.
+
 ## Troubleshooting
 
 - **No token in Firestore:** Check `VITE_FIREBASE_VAPID_PUBLIC_KEY`, HTTPS, and that the browser supports FCM (`isSupported()` in [useFcmToken.ts](mdc:src/hooks/useFcmToken.ts)).
