@@ -1,0 +1,23 @@
+---
+description: Vercel serverless — shared code must bundle with api/ (no fragile cross-folder imports)
+globs: api/**/*.ts
+alwaysApply: false
+---
+
+# Vercel API routes: shared modules
+
+## What goes wrong
+
+- Lambdas run from `/var/task/` with **only what the bundler includes**.
+- Imports like `../server/foo` or `./lib/foo` often fail at runtime with **`ERR_MODULE_NOT_FOUND`** — those paths are **not** guaranteed to exist next to `api/notify.js`, even with `vercel.json` `includeFiles`.
+- Node **ESM** also resolves imports strictly; extra folders outside the traced graph break easily.
+
+## Remedy (this repo)
+
+- Put shared helpers used by **`/api/notify`** and **`/api/cron/process-batch`** in **[api/notify.ts](mdc:api/notify.ts)** and **`export`** them (e.g. `getFcmTokenEntries`, `removeDeadFcmTokensAfterSend`).
+- **Cron** imports: `import { … } from "../notify"` so both routes share one **in-`api/`** module graph that Vercel bundles.
+- Do **not** add a separate `server/` or `api/lib/` module for Vercel-only code unless you have a proven bundling setup.
+
+## If you must split files
+
+Prefer **only** paths under `api/` that are **statically imported** from an entry `api/*.ts` and verify the deployed bundle — or accept **duplicating** small helpers per file to avoid runtime resolution issues.

@@ -29,7 +29,7 @@ export function useTrainerNotifications(
       try {
         new Notification(title, {
           body,
-          icon: "/IHN.png",
+          icon: "/IHN-Logo-1000x1000.png",
           tag: "training-schedule-inline",
         });
       } catch {

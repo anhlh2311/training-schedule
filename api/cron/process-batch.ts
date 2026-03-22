@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
 import {
-  getPushSubscriptionIdsFromDb,
-  sendOneSignalNotification,
+  getFcmTokenEntries,
+  removeDeadFcmTokensAfterSend,
 } from "../notify";
 
 function getFirebaseAdmin() {
@@ -13,15 +13,15 @@ function getFirebaseAdmin() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
-  
+
   if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
-  
+
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
   }
-  
+
   return admin.initializeApp({
     credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   });
@@ -79,13 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const trainerUids = await getTrainerUids(db);
-  const onesignalAppId = process.env.ONESIGNAL_APP_ID;
-  const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
-  const useOneSignal = Boolean(onesignalAppId && onesignalRestApiKey && trainerUids.length > 0);
-  const fcmTokens = useOneSignal ? [] : await getFcmTokensForUsers(db, trainerUids);
-  const subscriptionIds = useOneSignal
-    ? await getPushSubscriptionIdsFromDb(db, trainerUids)
-    : [];
+  const tokenEntries = await getFcmTokenEntries(db, trainerUids);
+  const fcmTokens = tokenEntries.map((e) => e.token);
   const batch = db.batch();
   let sent = 0;
 
@@ -96,19 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       count === 1
         ? "1 update from a trainer."
         : `${count} availability/event updates.`;
-    if (useOneSignal) {
-      const result = await sendOneSignalNotification(
-        onesignalAppId!,
-        onesignalRestApiKey!,
-        title,
-        body,
-        { subscriptionIds }
-      );
-      sent += result.sent;
-      if (result.error) {
-        console.error("[process-batch] OneSignal:", result.error);
-      }
-    } else if (fcmTokens.length > 0) {
+    if (fcmTokens.length > 0) {
       const messaging = getMessaging();
       const result = await messaging.sendEachForMulticast({
         notification: { title, body },
@@ -116,6 +99,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tokens: fcmTokens,
       });
       sent += result.successCount;
+      const pruned = await removeDeadFcmTokensAfterSend(db, tokenEntries, result.responses);
+      if (pruned > 0) {
+        console.info(`[process-batch] Removed ${pruned} dead fcmTokens document(s)`);
+      }
     }
     for (const id of entry.docIds) {
       batch.delete(db.collection("notificationQueue").doc(id));
@@ -134,17 +121,3 @@ async function getTrainerUids(db: Firestore): Promise<string[]> {
   return snap.docs.map((d) => d.id);
 }
 
-async function getFcmTokensForUsers(
-  db: Firestore,
-  uids: string[]
-): Promise<string[]> {
-  const tokens: string[] = [];
-  for (const uid of uids) {
-    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
-    for (const d of snap.docs) {
-      const t = d.data().token;
-      if (typeof t === "string") tokens.push(t);
-    }
-  }
-  return tokens;
-}
