@@ -2,6 +2,68 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Firestore } from "firebase-admin/firestore";
 import admin from "firebase-admin";
 
+/** Shared with [api/cron/process-batch.ts](api/cron/process-batch.ts) — keep in this file so Vercel bundles it (no extra `server/` path on disk). */
+export interface FcmTokenEntry {
+  token: string;
+  path: string;
+}
+
+export async function getFcmTokenEntries(
+  db: Firestore,
+  uids: string[]
+): Promise<FcmTokenEntry[]> {
+  const entries: FcmTokenEntry[] = [];
+  for (const uid of uids) {
+    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
+    for (const d of snap.docs) {
+      const t = d.data().token;
+      if (typeof t === "string" && t.trim().length > 0) {
+        entries.push({ token: t, path: d.ref.path });
+      }
+    }
+  }
+  return entries;
+}
+
+const FCM_PRUNE_ERROR_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+  "messaging/invalid-argument",
+]);
+
+export async function removeDeadFcmTokensAfterSend(
+  db: Firestore,
+  entries: FcmTokenEntry[],
+  responses: Array<{ success: boolean; error?: { code?: string } }>
+): Promise<number> {
+  const paths: string[] = [];
+  for (let i = 0; i < responses.length; i++) {
+    const r = responses[i];
+    if (r.success) continue;
+    const code = r.error?.code;
+    if (!code || !FCM_PRUNE_ERROR_CODES.has(code)) continue;
+    const path = entries[i]?.path;
+    if (path) paths.push(path);
+  }
+  if (paths.length === 0) return 0;
+
+  let batch = db.batch();
+  let ops = 0;
+  let total = 0;
+  for (const path of paths) {
+    batch.delete(db.doc(path));
+    ops++;
+    total++;
+    if (ops >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+  if (ops > 0) await batch.commit();
+  return total;
+}
+
 function getFirebaseAdmin() {
   // guard in case apps is undefined
   if (Array.isArray(admin.apps) && admin.apps.length > 0) return admin.app();
@@ -9,15 +71,15 @@ function getFirebaseAdmin() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
-  
+
   if (privateKey && !privateKey.includes("\n") && privateKey.includes("\\n")) {
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
-  
+
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY");
   }
-  
+
   return admin.initializeApp({
     credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
   });
@@ -35,7 +97,7 @@ function getMessaging() {
 
 const EVENT_SOON_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-/** When true, include debug info (payloadSummary, formatted, onesignal request/response) in API responses. */
+/** When true, include debug info (payloadSummary, formatted, FCM counts) in API responses. */
 const NOTIFY_DEBUG =
   process.env.NOTIFY_DEBUG === "true" || process.env.NOTIFY_DEBUG === "1";
 
@@ -83,30 +145,14 @@ function safeJson(res: VercelResponse, status: number, body: object): void {
   }
 }
 
-interface OneSignalDebug {
-  requestPayload: object;
-  response: { status: number; body: unknown };
-}
-
 function buildDebugInfo(
   body: NotifyBody,
   type: NotifyType,
   senderId: string,
   trainerUids: string[],
-  formatted: { title: string; body: string },
-  onesignal?: OneSignalDebug
-): {
-  type: NotifyType;
-  payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; eventStartTimeFormatted?: string; dropOffReason?: string };
-  formatted: { title: string; body: string };
-  onesignal?: OneSignalDebug;
-} {
-  const debug: {
-    type: NotifyType;
-    payloadSummary: { senderId: string; trainerUids: string[]; eventTitle?: string; eventStartTime?: string; eventStartTimeFormatted?: string; dropOffReason?: string };
-    formatted: { title: string; body: string };
-    onesignal?: OneSignalDebug;
-  } = {
+  formatted: { title: string; body: string }
+) {
+  return {
     type,
     payloadSummary: {
       senderId,
@@ -118,8 +164,6 @@ function buildDebugInfo(
     },
     formatted: { title: formatted.title, body: formatted.body },
   };
-  if (onesignal) debug.onesignal = onesignal;
-  return debug;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -196,68 +240,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const formatted = formatMessage(type, userName ?? "A trainer", body);
     const { title, body: messageBody } = formatted;
 
-    const onesignalAppId = process.env.ONESIGNAL_APP_ID;
-    const onesignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
-    if (onesignalAppId && onesignalRestApiKey && trainerUids.length > 0) {
-      const onesignalResult = await sendOneSignal(onesignalAppId, onesignalRestApiKey, trainerUids, title, messageBody);
-      const onesignalDebug: OneSignalDebug = {
-        requestPayload: onesignalResult.requestPayload,
-        response: onesignalResult.response,
-      };
-      const debugWithOneSignal = {
-        ...buildDebugInfo(body, type, userId, trainerUids, formatted, onesignalDebug),
-        trainerCount: trainerUids.length,
-      };
-      if (onesignalResult.error) {
-        console.error("[api/notify] OneSignal error:", onesignalResult.error);
-        const errorResponse: { error: string; detail: string; debug?: typeof debugWithOneSignal } = {
-          error: "OneSignal notification failed",
-          detail: onesignalResult.error,
-        };
-        if (NOTIFY_DEBUG) errorResponse.debug = debugWithOneSignal;
-        safeJson(res, 500, errorResponse);
-        return;
-      }
-      const successResponse: { sent: number; provider: string; debug?: typeof debugWithOneSignal } = {
-        sent: onesignalResult.sent,
-        provider: "onesignal",
-      };
-      if (NOTIFY_DEBUG) successResponse.debug = debugWithOneSignal;
-      safeJson(res, 200, successResponse);
-      return;
-    }
-
-    const tokens = await getFcmTokensForUsers(db, trainerUids);
+    const tokenEntries = await getFcmTokenEntries(db, trainerUids);
+    const tokens = tokenEntries.map((e) => e.token);
     if (tokens.length === 0) {
-      const response: { sent: number; debug?: object } = { sent: 0 };
+      const response: { sent: number; provider: string; debug?: object } = {
+        sent: 0,
+        provider: "fcm",
+      };
       if (NOTIFY_DEBUG) {
-        response.debug = {
-          ...buildDebugInfo(body, type, userId, trainerUids, formatted),
-          trainerCount: trainerUids.length,
-          tokenCount: 0,
-        };
+        response.debug = Object.assign(
+          buildDebugInfo(body, type, userId, trainerUids, formatted),
+          { trainerCount: trainerUids.length, tokenCount: 0 }
+        );
       }
       safeJson(res, 200, response);
       return;
     }
 
     const messaging = getMessaging();
+    // Web: use data-only payloads so the service worker is the only place that calls
+    // showNotification(). A `notification` payload does not reliably auto-display on
+    // Chrome/Safari web; combining it with onBackgroundMessage caused either duplicates
+    // or (if skipped) no notification at all. All `data` values must be strings (FCM).
+    const dataPayload: Record<string, string> = {
+      title,
+      body: messageBody,
+      type,
+      url: "/",
+    };
     const message = {
-      notification: { title, body: messageBody },
-      data: { type, url: "/" },
+      data: dataPayload,
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);
-    const fcmResponse: { sent: number; failed?: number; debug?: object } = {
+    const pruned = await removeDeadFcmTokensAfterSend(db, tokenEntries, result.responses);
+    if (pruned > 0) {
+      console.info(`[api/notify] Removed ${pruned} dead fcmTokens document(s)`);
+    }
+    const fcmResponse: {
+      sent: number;
+      failed?: number;
+      provider: string;
+      debug?: object;
+    } = {
       sent: result.successCount,
       failed: result.failureCount,
+      provider: "fcm",
     };
     if (NOTIFY_DEBUG) {
-      fcmResponse.debug = {
-        ...buildDebugInfo(body, type, userId, trainerUids, formatted),
-        trainerCount: trainerUids.length,
-        tokenCount: tokens.length,
-      };
+      const perToken = result.responses.map((r, index) => ({
+        index,
+        success: r.success,
+        error: r.error
+          ? { code: r.error.code, message: r.error.message }
+          : undefined,
+      }));
+      fcmResponse.debug = Object.assign(
+        buildDebugInfo(body, type, userId, trainerUids, formatted),
+        {
+          trainerCount: trainerUids.length,
+          tokenCount: tokens.length,
+          fcmTokensPruned: pruned,
+          fcmPerToken: perToken,
+        }
+      );
     }
     safeJson(res, 200, fcmResponse);
     return;
@@ -285,75 +331,6 @@ async function getTrainerUids(
     .filter((id) => id !== excludeUid);
 }
 
-async function getFcmTokensForUsers(
-  db: Firestore,
-  uids: string[]
-): Promise<string[]> {
-  const tokens: string[] = [];
-  for (const uid of uids) {
-    const snap = await db.collection("users").doc(uid).collection("fcmTokens").get();
-    for (const d of snap.docs) {
-      const t = d.data().token;
-      if (typeof t === "string") tokens.push(t);
-    }
-  }
-  return tokens;
-}
-
-interface OneSignalResult {
-  sent: number;
-  requestPayload: object;
-  response: { status: number; body: unknown };
-  error?: string;
-}
-
-async function sendOneSignal(
-  appId: string,
-  restApiKey: string,
-  externalUserIds: string[],
-  title: string,
-  body: string
-): Promise<OneSignalResult> {
-  // Use include_external_user_ids (legacy v1 API) - include_aliases can return "no recipients"
-  // even when users have enabled push subscriptions (known OneSignal API quirk).
-  const requestPayload = {
-    app_id: appId,
-    include_external_user_ids: externalUserIds,
-    headings: { en: title },
-    contents: { en: body },
-    data: { url: "/" },
-  };
-
-  const res = await fetch("https://onesignal.com/api/v1/notifications", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Key ${restApiKey}`,
-    },
-    body: JSON.stringify(requestPayload),
-  });
-
-  const text = await res.text();
-  let responseBody: unknown;
-  try {
-    responseBody = text ? (JSON.parse(text) as unknown) : {};
-  } catch {
-    responseBody = text || "(empty body)";
-  }
-
-  const result: OneSignalResult = {
-    sent: res.ok ? ((responseBody as { recipients?: number }).recipients ?? 0) : 0,
-    requestPayload,
-    response: { status: res.status, body: responseBody },
-  };
-
-  if (!res.ok) {
-    result.error = `OneSignal API ${res.status}: ${JSON.stringify(responseBody)}`;
-  }
-
-  return result;
-}
-
 function formatMessage(
   type: NotifyType,
   userName: string,
@@ -376,15 +353,13 @@ function formatMessage(
 
   switch (type) {
     case "availability_added":
+    case "availability_removed": {
+      const action = type === "availability_added" ? "added" : "removed";
       return {
         title: "Availability updated",
-        body: `${userName} added availability.`,
+        body: `${userName} ${action} availability.`,
       };
-    case "availability_removed":
-      return {
-        title: "Availability updated",
-        body: `${userName} removed availability.`,
-      };
+    }
     case "event_subscribe":
       return {
         title: "Event subscription",

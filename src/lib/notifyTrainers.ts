@@ -1,4 +1,5 @@
 import { auth } from "./firebase";
+import { postJsonWithAuth } from "./fetchWithAuth";
 import { dispatchNotifyDebug } from "./notifyDebug";
 
 export type NotifyEventType =
@@ -41,18 +42,9 @@ const NOTIFY_DEBUG =
 	import.meta.env.VITE_NOTIFY_DEBUG === "true" || import.meta.env.VITE_NOTIFY_DEBUG === "1";
 
 export async function notifyTrainers(payload: NotifyPayload): Promise<void> {
-	const user = auth.currentUser;
-	if (!user) return;
+	if (!auth.currentUser) return;
 	try {
-		const token = await user.getIdToken();
-		const res = await fetch("/api/notify", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${token}`,
-			},
-			body: JSON.stringify(payload),
-		});
+		const res = await postJsonWithAuth("/api/notify", payload);
 		const response = await res.json().catch(() => ({}));
 		if (NOTIFY_DEBUG) {
 			dispatchNotifyDebug({

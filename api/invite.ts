@@ -4,7 +4,7 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 const APP_URL = process.env.VITE_APP_URL || "https://your-app.vercel.app";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Training Schedule <onboarding@resend.dev>";
-const LOGO_URL = `${APP_URL}/IHN.png`;
+const LOGO_URL = `${APP_URL}/IHN-Logo-1000x1000.png`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

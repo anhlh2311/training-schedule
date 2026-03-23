@@ -1,13 +1,19 @@
 import { useEffect, useRef } from "react";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
-import { app, db } from "../lib/firebase";
+import { isIOSDevice } from "../lib/platform";
+import { registerTrainerFcmToken } from "../lib/registerFcmToken";
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_PUBLIC_KEY as string | undefined;
 
 /**
- * Registers for FCM, gets token, and saves it to Firestore under users/{uid}/fcmTokens/{tokenId}.
- * Call when user is signed in and is trainer/admin so they can receive push notifications.
- * Uses dynamic import for firebase/messaging so unsupported environments (e.g. iOS Safari) don't crash the app.
+ * Registers for FCM and saves the token to Firestore under users/{uid}/fcmTokens/{tokenId}.
+ * Call when user is signed in and is trainer/admin.
+ *
+ * **iOS:** WebKit does not reliably show the notification permission dialog when
+ * `Notification.requestPermission()` runs from a `useEffect` (no user gesture).
+ * On iOS we only auto-register if permission is already `granted`. Otherwise use
+ * `IosPushPermissionBanner` so the user taps "Enable notifications" first.
+ *
+ * **Other platforms:** Requests permission on mount when still `default`, then registers.
  */
 export function useFcmToken(userId: string | null, enabled: boolean) {
   const registered = useRef(false);
@@ -20,47 +26,31 @@ export function useFcmToken(userId: string | null, enabled: boolean) {
     let cancelled = false;
 
     async function register() {
-      try {
-        const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
-        const supported = await isSupported();
-        if (!supported || cancelled) return;
-
-        const messaging = getMessaging(app);
-        const registration = await navigator.serviceWorker.register(
-          "/firebase-messaging-sw.js",
-          { scope: "/" }
-        );
-
-        const token = await getToken(messaging, {
-          vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: registration,
-        });
-
-        if (!token || cancelled) return;
-
-        const tokenId = token.slice(0, 32).replace(/\W/g, "_");
-        const tokenRef = doc(db, "users", uid as string, "fcmTokens", tokenId);
-        await setDoc(tokenRef, {
-          token,
-          createdAt: Timestamp.now(),
-        });
-
-        if (!cancelled) registered.current = true;
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.warn("FCM registration failed (optional):", err);
-        }
+      const result = await registerTrainerFcmToken(uid as string);
+      if (!cancelled && result.ok) {
+        registered.current = true;
       }
     }
 
-    if (typeof Notification !== "undefined") {
+    if (typeof Notification === "undefined") return;
+
+    // iOS: only register when permission already granted (prompt via IosPushPermissionBanner).
+    if (isIOSDevice()) {
       if (Notification.permission === "granted") {
         register();
-      } else if (Notification.permission === "default") {
-        Notification.requestPermission().then((p) => {
-          if (p === "granted") register();
-        });
       }
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // Non-iOS: request permission without requiring a separate button (works on desktop/Android Chrome).
+    if (Notification.permission === "granted") {
+      register();
+    } else if (Notification.permission === "default") {
+      Notification.requestPermission().then((p) => {
+        if (p === "granted") register();
+      });
     }
 
     return () => {

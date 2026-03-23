@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
-import { useOneSignal } from "../hooks/useOneSignal";
+import { detachFcmForegroundListener } from "../lib/registerFcmToken";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
+import IosPushPermissionBanner from "./IosPushPermissionBanner";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
 import NotifyDebugLog from "./NotifyDebugLog";
@@ -19,8 +20,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, appUser, isTrainer, isMember, isAdmin, signOut, updateDisplayName } = useAuth();
   const location = useLocation();
 
-  useOneSignal(user?.uid ?? null, isTrainer, user?.email ?? null);
   useFcmToken(user?.uid ?? null, isTrainer);
+
+  useEffect(() => {
+    if (!user?.uid || !isTrainer) {
+      detachFcmForegroundListener();
+    }
+  }, [user?.uid, isTrainer]);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -56,7 +63,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900">
-              <img src="/IHN.png" alt="IHN Logo" className="h-14 w-14" />
+              <img src="/IHN-Logo-2000x2000.svg" alt="IHN Logo" className="h-14 w-14" />
               <span className="hidden sm:inline">Training Schedule</span>
             </Link>
 
@@ -325,7 +332,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </nav>
 
-      {isTrainer && <AddToHomeScreenPrompt />}
+      {isTrainer && (
+        <>
+          <AddToHomeScreenPrompt />
+          <IosPushPermissionBanner />
+        </>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
