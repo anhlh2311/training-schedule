@@ -2,6 +2,8 @@
 
 A React app for teams to register and view training availability on a shared calendar.
 
+**End users:** see [USER_GUIDE.md](USER_GUIDE.md) for signing in, add-to-home-screen, and push notifications (iOS, Android, desktop).
+
 ## Tech Stack
 
 - React 19 + TypeScript + Vite
@@ -66,20 +68,34 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 
 ## Push Notifications (FCM)
 
-Trainers receive push notifications when availability changes or when someone subscribes/drops off an event. The app uses **Firebase Cloud Messaging** for web push (service worker + VAPID).
+Trainer push uses **Firebase Cloud Messaging (FCM) for web** only (service worker + VAPID). There is **no third-party push SDK**—tokens live in Firestore and the server uses **Firebase Admin**.
+
+### Migration note
+
+If you are coming from an older setup that used another vendor for web push, **FCM registration tokens are not portable**. Users must open this app again (with notification permission) so a new token is stored under `users/{uid}/fcmTokens/*`.
 
 ### Setup
 
 1. Enable **Cloud Messaging** in Firebase and add **Web Push certificates** (VAPID) in Project settings
-2. Set `VITE_FIREBASE_VAPID_PUBLIC_KEY` in the client env; build generates [public/firebase-messaging-sw.js](public/firebase-messaging-sw.js) from `scripts/generate-firebase-sw.cjs`
-3. Server routes [api/notify.ts](api/notify.ts) and [api/cron/process-batch.ts](api/cron/process-batch.ts) send via `firebase-admin` to FCM registration tokens stored under `users/{uid}/fcmTokens/*`
+2. Set `VITE_FIREBASE_VAPID_PUBLIC_KEY` in the client env; `yarn build` runs `scripts/generate-firebase-sw.cjs`, which writes [public/firebase-messaging-sw.js](public/firebase-messaging-sw.js) with your Firebase web config
+3. Server routes [api/notify.ts](api/notify.ts) and [api/cron/process-batch.ts](api/cron/process-batch.ts) send via `firebase-admin` to every FCM token under `users/{uid}/fcmTokens/*` for target trainers (excluding the actor where applicable)
 
-See [docs/FCM_WEB_PUSH.md](docs/FCM_WEB_PUSH.md) for iOS PWA requirements and references.
+### How delivery works (web)
 
-### How it works
+- **Data-only FCM messages:** The API sends **`data` only** (`title`, `body`, `type`, `url` as strings)—not a separate `notification` block. On web, that avoids unreliable auto-display and ensures a **single** path: the service worker calls `showNotification()` in `onBackgroundMessage`.
+- **Background / PWA:** [public/firebase-messaging-sw.js](public/firebase-messaging-sw.js) (generated) handles background messages and shows the notification.
+- **Foreground (tab focused):** After a successful token save, [registerFcmToken.ts](src/lib/registerFcmToken.ts) attaches Firebase **`onMessage`** so trainers still see a system notification while the app is open. The listener is detached when the user signs out or is no longer a trainer (see [Layout.tsx](src/components/Layout.tsx)).
+- **Client registration:** [useFcmToken.ts](src/hooks/useFcmToken.ts) requests permission (where the platform allows) and calls `registerTrainerFcmToken` to write the token to Firestore.
+- **iOS (Safari PWA):** Notification permission must be triggered by a **user gesture**. Trainers on iOS in standalone mode see [IosPushPermissionBanner.tsx](src/components/IosPushPermissionBanner.tsx); see [docs/FCM_WEB_PUSH.md](docs/FCM_WEB_PUSH.md) for requirements and troubleshooting.
 
-- **Client:** [useFcmToken](src/hooks/useFcmToken.ts) registers the FCM token when a trainer is signed in and stores it in Firestore
-- **Server:** [api/notify.ts](api/notify.ts) sends `notification` + `data` payloads to all trainer tokens (excluding the actor)
+### Stale tokens and debug
+
+- Invalid tokens (e.g. `messaging/registration-token-not-registered`) are **removed from Firestore** after a failed send so the next request does not retry them. Affected users should reopen the app and ensure notifications are allowed to register a fresh token.
+- With **`NOTIFY_DEBUG`** enabled, `/api/notify` responses can include **`fcmPerToken`** (per-device success/errors), **`fcmTokensPruned`**, and payload summaries—useful on staging. Pair with **`VITE_NOTIFY_DEBUG`** for the in-app log panel.
+
+### Serverless bundling (Vercel)
+
+Shared FCM helpers (`getFcmTokenEntries`, `removeDeadFcmTokensAfterSend`) are **exported from** [api/notify.ts](api/notify.ts) and imported by the cron handler so all code is bundled on deploy. See [docs/VERCEL_API_BUNDLING.md](docs/VERCEL_API_BUNDLING.md) if you add more API routes that share server code.
 
 ## Trainer Notifications
 
@@ -101,24 +117,27 @@ The `Cross-Origin-Opener-Policy: same-origin-allow-popups` header is set in [ver
 
 ```text
 api/
-  notify.ts              Vercel serverless: receives events, sends FCM
+  notify.ts              Vercel serverless: receives events, sends FCM (exports shared FCM helpers)
   manifest.ts            PWA manifest endpoint
   cron/
-    process-batch.ts     Batched notification delivery
+    process-batch.ts     Batched notification delivery (imports FCM helpers from notify.ts)
 public/
   firebase-messaging-sw.js  FCM service worker (generated from env at build)
 src/
   components/
-    AddToHomeScreenPrompt.tsx  iOS PWA install banner
-    CalendarView.tsx           Shared calendar component
-    Layout.tsx                 App shell with nav bar
-    ProtectedRoute.tsx         Auth route guard
+    AddToHomeScreenPrompt.tsx   iOS PWA install banner
+    IosPushPermissionBanner.tsx iOS PWA: user-gesture “Enable notifications”
+    NotifyDebugLog.tsx          Optional notify API debug panel (VITE_NOTIFY_DEBUG)
+    CalendarView.tsx            Shared calendar component
+    Layout.tsx                  App shell; detaches FCM foreground listener on logout
+    ProtectedRoute.tsx          Auth route guard
   context/
     AuthContext.tsx            Auth state provider
   hooks/
     useFcmToken.ts             FCM token registration for trainers
   lib/
     firebase.ts                 Firebase initialization
+    registerFcmToken.ts         getToken + Firestore write + foreground onMessage
     notifyTrainers.ts           Client API for triggering notifications
   pages/
     LoginPage.tsx               Google sign-in
@@ -134,6 +153,8 @@ src/
 ```
 
 ## Build
+
+The build runs `scripts/generate-firebase-sw.cjs` first so **FCM service worker** config matches `.env`, then Vite.
 
 The build uses Vite with:
 
