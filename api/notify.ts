@@ -258,9 +258,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const messaging = getMessaging();
+    // Web: use data-only payloads so the service worker is the only place that calls
+    // showNotification(). A `notification` payload does not reliably auto-display on
+    // Chrome/Safari web; combining it with onBackgroundMessage caused either duplicates
+    // or (if skipped) no notification at all. All `data` values must be strings (FCM).
+    const dataPayload: Record<string, string> = {
+      title,
+      body: messageBody,
+      type,
+      url: "/",
+    };
     const message = {
-      notification: { title, body: messageBody },
-      data: { type, url: "/" },
+      data: dataPayload,
       tokens,
     };
     const result = await messaging.sendEachForMulticast(message);

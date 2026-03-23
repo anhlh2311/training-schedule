@@ -32,18 +32,21 @@ firebase.initializeApp(${JSON.stringify(config)});
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  // Messages that include a \`notification\` payload are shown automatically by
-  // the browser/FCM when the app is in the background. Calling showNotification()
-  // here would show the same alert twice (duplicate notifications).
-  if (payload.notification) {
-    return;
-  }
-  const title = payload.data?.title || "Training Schedule";
+  // Server sends data-only messages (title/body in data) so this is the single
+  // display path on web — FCM does not reliably auto-show \`notification\` on
+  // Chrome/Safari. Fallback to \`notification\` for older cached payloads.
+  const data = payload.data || {};
+  const title =
+    data.title || payload.notification?.title || "Training Schedule";
+  const body = data.body || payload.notification?.body || "";
   const options = {
-    body: payload.data?.body || "",
-    icon: payload.data?.icon || "/IHN-Logo-1000x1000.png",
-    tag: payload.data?.tag || "training-schedule",
-    data: payload.data || {},
+    body,
+    icon:
+      payload.notification?.icon ||
+      data.icon ||
+      "/IHN-Logo-1000x1000.png",
+    tag: data.tag || "training-schedule",
+    data: Object.keys(data).length ? data : { url: "/" },
   };
   return self.registration.showNotification(title, options);
 });

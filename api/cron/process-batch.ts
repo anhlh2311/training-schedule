@@ -93,9 +93,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : `${count} availability/event updates.`;
     if (fcmTokens.length > 0) {
       const messaging = getMessaging();
+      const dataPayload: Record<string, string> = {
+        title,
+        body,
+        type: String(entry.type),
+        url: "/",
+      };
       const result = await messaging.sendEachForMulticast({
-        notification: { title, body },
-        data: { type: entry.type, url: "/" },
+        data: dataPayload,
         tokens: fcmTokens,
       });
       sent += result.successCount;

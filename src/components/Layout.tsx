@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFcmToken } from "../hooks/useFcmToken";
+import { detachFcmForegroundListener } from "../lib/registerFcmToken";
 import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import IosPushPermissionBanner from "./IosPushPermissionBanner";
 import DisplayNameModal from "./DisplayNameModal";
@@ -20,6 +21,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   useFcmToken(user?.uid ?? null, isTrainer);
+
+  useEffect(() => {
+    if (!user?.uid || !isTrainer) {
+      detachFcmForegroundListener();
+    }
+  }, [user?.uid, isTrainer]);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
