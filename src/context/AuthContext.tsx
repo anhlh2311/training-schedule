@@ -13,20 +13,16 @@ import {
   type User,
 } from "firebase/auth";
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  query,
   setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   Timestamp,
-  where,
-  writeBatch,
 } from "firebase/firestore";
 import { auth, googleProvider, db } from "../lib/firebase";
+import { syncDenormalizedForUser } from "../lib/syncDisplayNamesAdmin";
 import type { AppUser, UserRole } from "../types";
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -214,23 +210,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await withRetry(() => updateDoc(userRef, { displayName: trimmed }));
     await updateProfile(user, { displayName: trimmed });
 
-    const availabilitiesQuery = query(
-      collection(db, "availabilities"),
-      where("userId", "==", user.uid)
-    );
-    const snap = await withRetry(() => getDocs(availabilitiesQuery));
-    if (snap.empty) return;
-
-    const BATCH_SIZE = 500;
-    const docs = snap.docs;
-    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-      const batch = writeBatch(db);
-      const chunk = docs.slice(i, i + BATCH_SIZE);
-      for (const d of chunk) {
-        batch.update(d.ref, { userName: trimmed });
-      }
-      await withRetry(() => batch.commit());
-    }
+    const patch = {
+      userName: trimmed,
+      userPhotoURL: user.photoURL ?? "",
+      userEmail: user.email ?? "",
+    };
+    await withRetry(() => syncDenormalizedForUser(user.uid, patch));
   }
 
   return (

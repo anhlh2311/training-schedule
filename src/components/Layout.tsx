@@ -7,6 +7,7 @@ import AddToHomeScreenPrompt from "./AddToHomeScreenPrompt";
 import IosPushPermissionBanner from "./IosPushPermissionBanner";
 import DisplayNameModal from "./DisplayNameModal";
 import DuplicateEventsModal from "./DuplicateEventsModal";
+import SyncDisplayNamesModal from "./SyncDisplayNamesModal";
 import NotifyDebugLog from "./NotifyDebugLog";
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
@@ -32,6 +33,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [syncNamesModalOpen, setSyncNamesModalOpen] = useState(false);
 
   const displayName = appUser?.displayName || user?.displayName || "";
 
@@ -233,6 +235,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         Duplicate events
                       </button>
                     )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setSyncNamesModalOpen(true); setUserMenuOpen(false); }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+                        role="menuitem"
+                      >
+                        <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Sync display names
+                      </button>
+                    )}
                     <button
                       onClick={() => { signOut(); setUserMenuOpen(false); }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
@@ -305,6 +319,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     Duplicate events
                   </button>
                 )}
+                {isAdmin && (
+                  <button
+                    onClick={() => { setSyncNamesModalOpen(true); setMobileOpen(false); }}
+                    className="flex items-center gap-2 rounded-lg p-2 text-left text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    <svg className="h-5 w-5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    Sync display names
+                  </button>
+                )}
                 {/* Line 3: Sign out */}
                 <button
                   onClick={() => { signOut(); setMobileOpen(false); }}
@@ -329,6 +354,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <DuplicateEventsModal
           open={duplicateModalOpen}
           onClose={() => setDuplicateModalOpen(false)}
+        />
+        <SyncDisplayNamesModal
+          open={syncNamesModalOpen}
+          onClose={() => setSyncNamesModalOpen(false)}
         />
       </nav>
 
