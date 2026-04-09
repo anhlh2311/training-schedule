@@ -53,7 +53,8 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase app ID |
 | `VITE_FIREBASE_VAPID_PUBLIC_KEY` | **Required for push notifications.** Web Push VAPID key from Firebase Console > Project settings > Cloud Messaging > Web Push certificates |
-| `VITE_APP_URL` | Base URL of the deployed app (e.g. `https://your-app.vercel.app`) |
+| `VITE_APP_URL` | Base URL of the deployed app (e.g. `https://your-app.vercel.app`) — also used in invite emails |
+| `VITE_ADMIN_EMAIL` | **Bootstrap admin only.** Google account email that receives `role: admin` on **first** sign-in when no `users/{uid}` doc exists yet. Other admins are assigned in-app. |
 
 **For Vercel API (trainer notifications):** set these in Vercel project settings so `/api/notify` and the cron can use Firebase Admin and FCM:
 
@@ -65,6 +66,47 @@ Create a `.env` file from `.env.example` with your Firebase project values:
 | `NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to include debug info (payloadSummary, FCM counts) in `/api/notify` responses. Useful for staging. |
 | `VITE_NOTIFY_DEBUG` | (Optional) Set to `true` or `1` to show a log panel at the bottom of the page with notify API responses. Use with `NOTIFY_DEBUG`. |
 | `CRON_SECRET` | (Optional) Secret for securing `/api/cron/process-batch` if not using Vercel Cron |
+
+**For invite emails (`/api/invite`):** set on the server (e.g. Vercel):
+
+| Variable | Description |
+|---|---|
+| `RESEND_API_KEY` | API key from [Resend](https://resend.com) |
+| `RESEND_FROM_EMAIL` | Sender address, e.g. `Training Schedule <noreply@yourdomain.com>`. Must use a domain you have verified in Resend (or Resend’s test domain while evaluating). |
+
+## Invitations (trainers & members)
+
+Invitations tie **Google sign-in** to an initial **role** before the user exists in Firestore.
+
+### How it works
+
+1. **Bootstrap admin (first operator)**  
+   Set `VITE_ADMIN_EMAIL` to the Google email of the first admin. On their **first** successful sign-in, [AuthContext](src/context/AuthContext.tsx) creates `users/{uid}` with `role: admin` (no invite document needed).
+
+2. **Inviting trainers or members**  
+   An admin opens **Admin → Trainers** ([TrainersPage.tsx](src/pages/admin/TrainersPage.tsx)), enters an email and role (**trainer** or **member**), and submits. The app:
+   - Writes **`invites/{email}`** in Firestore (document id = lowercase email) with `role` and `createdAt`.
+   - **`POST`s [api/invite.ts](api/invite.ts)** to send a welcome email. If the request fails, the invite **still exists** in Firestore (email is best-effort).
+
+3. **First sign-in for an invited user**  
+   When a new Google user has **no** `users/{uid}` document yet, the app checks **`invites/{email}`**. If present, their `role` is set from that document (trainer or member), then the invite document is **deleted**. If there is no invite and they are not `VITE_ADMIN_EMAIL`, the default role is **user**.
+
+4. **Pending invites**  
+   Admins can see and revoke rows under the `invites` collection from the same page (delete = revoke).
+
+Firestore security rules for `invites` are in [firestore.rules](firestore.rules) (admins create/delete; invitee can delete their own pending invite by email match on token).
+
+### Third-party service: Resend
+
+[Resend](https://resend.com) is used only for **transactional email** from [api/invite.ts](api/invite.ts) (HTML + text “your account is ready” with app link and logo URL derived from `VITE_APP_URL`). It is **not** used for push notifications (those use FCM).
+
+**Setup:**
+
+1. Create a Resend account and generate an **API key**.
+2. **Verify a sending domain** in Resend (SPF/DKIM) and use an address on that domain in `RESEND_FROM_EMAIL`, or use Resend’s documented test flow for development.
+3. Set **`RESEND_API_KEY`**, **`RESEND_FROM_EMAIL`**, and **`VITE_APP_URL`** on your deployment so `/api/invite` can build links and authenticate to Resend.
+
+**Local development:** Standard `yarn dev` serves the Vite app only; **`/api/invite` runs on Vercel** (or via `vercel dev` with the same env). You can still create **`invites`** documents from the UI locally; the email sends only when the Resend-backed route runs with valid `RESEND_*` env.
 
 ## Push Notifications (FCM)
 
@@ -107,8 +149,8 @@ Admins can enable **notification aggregation** under **Settings** so updates are
 
 1. Push the repo to GitHub
 2. Import the project on [Vercel](https://vercel.com)
-3. Add all `VITE_FIREBASE_*` environment variables (including `VITE_FIREBASE_VAPID_PUBLIC_KEY`) in the Vercel project settings
-4. Add server vars: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+3. Add all `VITE_FIREBASE_*` environment variables (including `VITE_FIREBASE_VAPID_PUBLIC_KEY` and `VITE_ADMIN_EMAIL` / `VITE_APP_URL` as needed) in the Vercel project settings
+4. Add server vars: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, plus `RESEND_API_KEY` and `RESEND_FROM_EMAIL` if you use email invites
 5. Deploy
 
 The `Cross-Origin-Opener-Policy: same-origin-allow-popups` header is set in [vercel.json](vercel.json) for Firebase Auth popup compatibility.
@@ -118,6 +160,7 @@ The `Cross-Origin-Opener-Policy: same-origin-allow-popups` header is set in [ver
 ```text
 api/
   notify.ts              Vercel serverless: receives events, sends FCM (exports shared FCM helpers)
+  invite.ts              Resend: welcome email after admin creates an invite
   manifest.ts            PWA manifest endpoint
   cron/
     process-batch.ts     Batched notification delivery (imports FCM helpers from notify.ts)
